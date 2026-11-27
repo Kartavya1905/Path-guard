@@ -27,6 +27,7 @@ PREFIXES = {
     "note": "not",
     "version": "ver",
     "outcome": "out",
+    "signoff": "sgn",
     "user": "usr",
 }
 

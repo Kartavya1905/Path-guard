@@ -2,7 +2,7 @@
 
 A visual project risk planner. You enter a starting situation and a goal, and PathGuard builds an editable scenario map of success, failure, delay and recovery paths. It ranks risks and compares a safeguard against a saved baseline. Everything runs locally. It uses no paid services, credentials or external AI.
 
-> Status: **Step 8 (baseline vs mitigation comparison, seeded examples)**. Later steps are tracked in the plan below.
+> Status: **Step 9 (export and outcome logging)**. Later steps are tracked in the plan below.
 
 ## Scenario engine
 
@@ -126,6 +126,50 @@ Two checkout examples are seeded, with every number labeled hypothetical:
   - Valid cart 92%, authorized payment 90%, confirmed order 98%, so the primary path is **81.144%**.
   - The alternate cart, payment and confirmation outcomes are modeled.
   - Versions: v1 Baseline.
+
+### Reports and export
+
+Open **Report** from the workspace toolbar (`#/p/<id>/report`). The report covers:
+
+- A static snapshot of the map: each link labeled with its outcome and estimate, with line styles as well as colour.
+- First-pass and eventual success, and how runs end.
+- The risk register: rank, impact, likelihood, evidence and status.
+- Mitigations and their owners.
+- An optional comparison with another version.
+- Assumptions, estimate sources (with verification), open evidence gaps, and review status.
+
+How to use it:
+
+- **Print / save as PDF** uses the browser's print dialog. Print styles hide the app's buttons and menus.
+- **Download risk register (CSV)** is UTF-8 with a BOM, so Excel opens it correctly.
+  - User text is quoted correctly: commas, quotes and line breaks all survive.
+  - Cells starting with `=`, `+`, `-`, `@`, tab or carriage return get a leading apostrophe, so spreadsheet apps can't run them as formulas.
+- **Draft vs reviewed:**
+  - The working map, and any version without a sign-off, are labeled **DRAFT** in the report, the CSV's "Report status" column and the file name.
+  - An owner or reviewer can **sign off** a saved version, but only when that version can be marked reviewed: analyzable, with every suggestion decided.
+  - The report is then labeled **REVIEWED**, with the reviewer, the date and the version's content hash.
+  - Sign-offs are insert-only and audited.
+- **Access:** exports are generated locally by the API and permission-checked like every other route.
+
+API: `GET /api/projects/{id}/report?version=&compare_with=`, `GET …/report/risks.csv?version=`, `POST …/versions/{vid}/signoff`, `GET …/versions/{vid}/signoffs`.
+
+### Observed outcomes
+
+In the workspace **Outcomes** view:
+
+- **Record** what actually happened at one decision of a saved version: the branch, eligible runs (exposure), runs that took the branch, the period, context tags and notes. Editors and owners can record. Outcomes are insert-only.
+- **Estimate candidate:** pick a branch and the context tags you want to match.
+  - Only **comparable** observations count: same decision, same branch, exactly the same context tags (case-insensitive). Every excluded record is listed with its reason.
+  - Below **30 eligible runs**, or with no comparable data, the result stays **unresolved**.
+  - Otherwise the candidate is a **measured** estimate: occurrences ÷ exposure, exact to 10 decimal places. It shows the count, denominator, date range and comparability rule.
+- **Approve and apply** (owners and reviewers only):
+  - The server recalculates the candidate.
+  - It saves the current map as a **snapshot version**, so older estimates and evidence are kept.
+  - It sets the estimate as **reviewed** by the approver, attaches an "Observed outcomes" evidence item, and saves a new revision.
+  - For a complete decision, the other branches must be changed explicitly so it still totals 100%. Nothing is rebalanced automatically.
+- Nothing learns automatically, and no external data is fetched.
+
+API: `GET/POST /api/projects/{id}/outcomes`, `GET …/outcomes/proposal?transition_id=&context=`, `POST …/outcomes/apply`.
 
 ### Validation
 

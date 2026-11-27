@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
 from app.api import router
+from app.api_reports import router as reports_router
 from app.config import get_settings
 from app.db import database_ready
 
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
         }}, status_code=409)
 
     app.include_router(router)
+    app.include_router(reports_router)
     # Single-container hosting: serve the built web app after the API routes.
     if settings.static_dir and Path(settings.static_dir).is_dir():
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="web")

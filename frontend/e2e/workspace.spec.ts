@@ -202,3 +202,56 @@ test('save a baseline, apply the checklist as a variant, and see +8.55 pp', asyn
   await expect(page.locator('.version-list li')).toHaveCount(2)
   await expect(page.locator('.comparison .delta-card').first()).toContainText('+8.55 pp')
 })
+
+test('report, CSV export, sign-off, and an outcome turned into an approved estimate', async ({ page }) => {
+  // Copy the seeded transaction example into a fresh project with a saved baseline.
+  const projects = await (await page.request.get('/api/projects')).json() as { id: string; title: string }[]
+  const seeded = projects.find((p) => p.title === 'Checkout transaction (example)')!
+  const vs = await (await page.request.get(`/api/projects/${seeded.id}/versions`)).json()
+  const base = await (await page.request.get(`/api/projects/${seeded.id}/versions/${vs[0].id}`)).json()
+  const made = await (await page.request.post('/api/projects', { data: { start: base.plan.project.start, goal: base.plan.project.goal, title: 'Outcome demo' } })).json()
+  const id = made.plan.project.id as string
+  created.push(id)
+  await page.request.put(`/api/projects/${id}/graph`, { data: { graph: base.graph, revision: 1 } })
+  expect((await page.request.post(`/api/projects/${id}/versions`, { data: { label: 'Baseline', kind: 'baseline', revision: 2 } })).status()).toBe(201)
+
+  // Draft report and CSV.
+  await page.goto(`/#/p/${id}/report`)
+  await expect(page.locator('.report-status')).toContainText('DRAFT')
+  await expect(page.getByRole('img', { name: 'Scenario map snapshot' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Risk register' })).toBeVisible()
+  await expect(page.locator('.report')).toContainText('81.1% (exact 81.144%)')
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('link', { name: 'Download risk register (CSV)' }).click(),
+  ])
+  expect(download.suggestedFilename()).toContain('draft-risk-register.csv')
+
+  // Sign off the saved version: the report becomes "reviewed".
+  await page.getByLabel('Report on').selectOption({ label: 'v1 · Baseline' })
+  await page.getByLabel('Sign-off note').fill('Numbers checked')
+  await page.getByRole('button', { name: 'Sign off as reviewed' }).click()
+  await expect(page.locator('.report-status')).toContainText('REVIEWED')
+
+  // Record an outcome, review the candidate, approve it with an explicit sibling change.
+  await page.goto(`/#/p/${id}`)
+  await page.getByRole('button', { name: 'Outcomes', exact: true }).click()
+  await page.getByLabel('Branch observed').selectOption({ label: 'Payment authorized?: Authorize payment → Confirm order (Payment authorized)' })
+  await page.getByLabel('Eligible runs (reached the decision)').fill('200')
+  await page.getByLabel('Runs that took this branch').fill('185')
+  await page.getByLabel('Context tags (comma separated)').fill('web')
+  await page.getByRole('button', { name: 'Record outcome' }).click()
+  await expect(page.getByText('Outcome recorded.')).toBeVisible()
+  await expect(page.locator('.versions')).toContainText('185 of 200 eligible runs')
+
+  await page.getByLabel('Branch to estimate').selectOption({ label: 'Payment authorized?: Authorize payment → Confirm order (Payment authorized)' })
+  await page.getByLabel('Context tags to match').fill('web')
+  await page.getByRole('button', { name: 'Check' }).click()
+  await expect(page.locator('.proposal')).toContainText('Candidate')
+  await expect(page.locator('.proposal')).toContainText('185 / 200')
+  await page.getByLabel('New percent for Payment declined').fill('7.5')
+  await page.getByLabel('Assumption for Payment declined').fill('Remainder of observed runs')
+  await page.getByRole('button', { name: 'Approve and apply' }).click()
+  await expect(page.getByText(/Estimate updated in a new revision/)).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Probability' })).toContainText('83.4%')
+})

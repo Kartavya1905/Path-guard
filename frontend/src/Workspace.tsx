@@ -10,6 +10,7 @@ import {
 import AnalysisPanel from './AnalysisPanel'
 import Inspector from './Inspector'
 import MapCanvas, { type Highlight, type Selection } from './MapCanvas'
+import OutcomesPanel from './OutcomesPanel'
 import VersionsPanel from './VersionsPanel'
 import WorstCases from './WorstCases'
 
@@ -50,7 +51,7 @@ export default function Workspace({ projectId }: Props) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [explorer, setExplorer] = useState<Explorer | null>(null)
   const [explorerError, setExplorerError] = useState<string | null>(null)
-  const [centerView, setCenterView] = useState<'map' | 'worst' | 'versions'>('map')
+  const [centerView, setCenterView] = useState<'map' | 'worst' | 'versions' | 'outcomes'>('map')
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const savedRevision = data?.revision
   useEffect(() => {
@@ -245,7 +246,9 @@ export default function Workspace({ projectId }: Props) {
             <button type="button" aria-pressed={centerView === 'map'} onClick={() => setCenterView('map')}>Map</button>
             <button type="button" aria-pressed={centerView === 'worst'} onClick={() => setCenterView('worst')}>Worst cases</button>
             <button type="button" aria-pressed={centerView === 'versions'} onClick={() => setCenterView('versions')}>Versions</button>
+            <button type="button" aria-pressed={centerView === 'outcomes'} onClick={() => setCenterView('outcomes')}>Outcomes</button>
           </div>
+          <a className="button" href={`#/p/${projectId}/report`}>Report</a>
           {canEdit && (
             <button type="button" className={empty ? 'primary' : ''} disabled={busy} onClick={generate}>
               {empty ? 'Generate map' : 'Regenerate from plan'}
@@ -280,7 +283,11 @@ export default function Workspace({ projectId }: Props) {
         {!canEdit && <p className="alert info banner">Your role ({role}) can view this map{canReview ? ' and review suggestions' : ''} but not edit it.</p>}
         {centerView === 'map' && <Legend />}
         <div className={centerView === 'map' ? 'canvas' : 'canvas scroll'}>
-          {centerView === 'versions' ? (
+          {centerView === 'outcomes' ? (
+            <OutcomesPanel projectId={projectId} graph={graph} revision={data.revision} dirty={dirty}
+              canRecord={canEdit} canApprove={role === 'owner' || role === 'reviewer'}
+              onApplied={applyServer} />
+          ) : centerView === 'versions' ? (
             <VersionsPanel projectId={projectId} revision={data.revision} dirty={dirty}
               canPublish={canEdit} onSaved={() => undefined} />
           ) : centerView === 'worst' ? (

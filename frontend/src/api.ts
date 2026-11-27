@@ -405,3 +405,46 @@ export const versionsApi = {
   compare: (id: string, baseline: string, variant: string) =>
     request<Comparison>('GET', `${vp(id)}/compare?baseline=${encodeURIComponent(baseline)}&variant=${encodeURIComponent(variant)}`),
 }
+
+// --------------------------------------------------------------------------- reports and outcomes
+
+export type Signoff = { id: string; version_id: string; reviewer_id: string; reviewer_name: string; content_hash: string; note: string | null; created_at: string }
+export type Report = {
+  mode: 'draft' | 'reviewed'; status_label: string; title: string; generated_at: string
+  version: VersionSummary | null; signoffs: Signoff[]
+  plan: DraftOut['plan']; graph: ScenarioGraph; readiness: Readiness; analysis: Analysis; explorer: Explorer
+  comparison: Comparison | null; compare_version: VersionSummary | null
+  estimate_sources: { transition_id: string; link: string; estimate: string; source: string; detail: string; verification: string }[]
+  evidence_gaps: { kind: string; target_id: string; message: string }[]
+  review_summary: Record<string, Record<string, number>>
+}
+export type ObservedOutcome = {
+  id: string; version_id: string; decision_group_id: string; transition_id: string | null
+  observed_on: string; period_start: string | null; period_end: string | null
+  exposure: number; occurrences: number; context: string[]; notes: string | null; recorded_by: string; created_at: string
+}
+export type OutcomeIn = Omit<ObservedOutcome, 'id' | 'recorded_by' | 'created_at'>
+export type Proposal = {
+  transition_id: string; decision_group_id: string | null; status: 'candidate' | 'unresolved'; message: string
+  context: string[]; used: string[]; excluded: { outcome_id: string; reason: string }[]
+  occurrences: number; exposure: number; date_from: string | null; date_to: string | null
+  comparability: string; candidate: Estimate | null; current: Estimate; group_complete: boolean
+  siblings: { transition_id: string; trigger: string; current: string }[]
+}
+
+const rp = (id: string) => `/projects/${encodeURIComponent(id)}`
+export const reportApi = {
+  get: (id: string, version: string, compareWith: string) =>
+    request<Report>('GET', `${rp(id)}/report?version=${encodeURIComponent(version)}&compare_with=${encodeURIComponent(compareWith)}`),
+  csvUrl: (id: string, version: string) => `/api${rp(id)}/report/risks.csv?version=${encodeURIComponent(version)}`,
+  signOff: (id: string, vid: string, note: string) =>
+    request<Signoff>('POST', `${rp(id)}/versions/${encodeURIComponent(vid)}/signoff`, { note: note || null }),
+}
+export const outcomesApi = {
+  list: (id: string) => request<ObservedOutcome[]>('GET', `${rp(id)}/outcomes`),
+  record: (id: string, body: OutcomeIn) => request<ObservedOutcome>('POST', `${rp(id)}/outcomes`, body),
+  proposal: (id: string, transitionId: string, context: string) =>
+    request<Proposal>('GET', `${rp(id)}/outcomes/proposal?transition_id=${encodeURIComponent(transitionId)}&context=${encodeURIComponent(context)}`),
+  apply: (id: string, body: { transition_id: string; context: string[]; sibling_changes: { transition_id: string; new_probability: Estimate }[]; evidence_quality: string; revision: number }) =>
+    request<GraphOut>('POST', `${rp(id)}/outcomes/apply`, body),
+}
