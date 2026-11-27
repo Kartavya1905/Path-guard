@@ -2,7 +2,7 @@
 
 A visual project risk planner. You enter a starting situation and a goal, and PathGuard builds an editable scenario map of success, failure, delay and recovery paths. It ranks risks and compares a safeguard against a saved baseline. Everything runs locally. It uses no paid services, credentials or external AI.
 
-> Status: **Steps 0–10 complete** (verified; see [docs/verification.md](docs/verification.md)). Step 11, optional AI suggestions, is not built. Human pilot testing is **pending**.
+> Status: **Steps 0–11 complete** (verified; see [docs/verification.md](docs/verification.md)). Optional AI suggestions are built but **off by default**. Human pilot testing is **pending**.
 
 ## Quick start (Windows, PowerShell)
 
@@ -72,12 +72,12 @@ docker compose down -v
 - **Export:** printable report (save as PDF) and a CSV risk register with formula protection. Drafts are labeled, and "reviewed" requires a reviewer's sign-off.
 - **Outcomes:** logging tied to a version and a decision. Estimate candidates use comparable data only, and sparse data stays unresolved. Applying one needs a reviewer, and the old map is snapshotted first.
 - **Access and safety:** project roles, revision conflicts, one transaction per request, append-only audit trail and write-once tables. Local demo identity is off in production. The public demo gives each browser its own anonymous account, with expiry.
-- **Runtime AI:** none. Every calculation, generation, ranking, comparison and export is local, using zero LLM tokens.
+- **Runtime AI:** none by default. Every calculation, generation, ranking, comparison and export is local, using zero LLM tokens. Optional AI suggestions (see below) run only when you click for them.
 
 ## Remaining gaps
 
 - **Human pilot testing:** pending ([plan](docs/pilot-plan.md)).
-- **Step 11, optional AI suggestions:** not built. The core workflow doesn't need it.
+- **Optional AI:** quality depends on the local model. The default `qwen2.5:1.5b` is fast but often restates existing steps, which are then rejected as duplicates; `llama3.1:8b` gives better suggestions but is slower. Only Ollama is implemented.
 - **Hosted demo:** ready, but waiting for the Render and Neon accounts.
 - **Real sign-in (OIDC):** not implemented. The public demo uses anonymous per-browser identity, which isn't authentication ([security.md](docs/security.md)).
 - **Range results:** these are outer bounds, with each estimate independent within its range, and can be wide. Exact results need point estimates.
@@ -250,6 +250,31 @@ In the workspace **Outcomes** view:
 - Nothing learns automatically, and no external data is fetched.
 
 API: `GET/POST /api/projects/{id}/outcomes`, `GET …/outcomes/proposal?transition_id=&context=`, `POST …/outcomes/apply`.
+
+### Optional AI suggestions (off by default)
+
+AI suggestions add hazards, missing steps and recovery branches to the **same review list** as the rule suggestions. They are hypotheses with no numbers. The rules-only workflow is complete without them.
+
+- **Turning it on:** it's off unless `PATHGUARD_AI_ENABLED=true`.
+  - Locally it uses the free **Ollama** on this computer (`PATHGUARD_AI_BASE_URL`, default `http://127.0.0.1:11434`; Compose uses `host.docker.internal`), with the model `PATHGUARD_AI_MODEL` (default `qwen2.5:1.5b`).
+  - To try it with Docker, run:
+
+    ```powershell
+    $env:PATHGUARD_AI_ENABLED = "true"; docker compose up -d --build
+    ```
+
+  - The workspace then shows **Suggest with AI** in the left panel.
+- **Only on request:** the model is called only when you click that button (`POST /api/projects/{id}/ai/suggestions`). Edits, page loads and recalculation never call it, and a test checks this.
+- **Small, capped prompt:** only the start, goal, constraints and the steps within two hops of the selected step (or the main path) are sent. That's at most 25 nodes and 6,000 characters, with no estimates. Output is capped at 700 tokens and must follow a compact JSON schema.
+- **Cached:** each reply is stored per project under the prompt version, provider, model and exact input. A matching request reuses it instead of calling the model.
+- **Strict checks:** unknown fields, node IDs not in the request, duplicates, and **anything that looks like a numeric estimate** ("30%", "probability of 0.3", "1 in 5 chance") are rejected and listed.
+- **What accepted output becomes:**
+  - Hazards become suggested risks (origin `ai`, unknown likelihood).
+  - Missing steps become a suggestion to add that task to the plan.
+  - Recoveries become a suggested branch with unknown estimates and a retry limit.
+  - Nothing is modeled until someone accepts it, and its estimates stay unknown until a person supplies them.
+- **Failures change nothing:** if the model is missing, slow (120-second timeout) or returns invalid output, the map is left unchanged and the error says so.
+- **Remote models:** a model on another host counts as remote. It only receives project data when **both** `PATHGUARD_EXTERNAL_PROCESSING_ENABLED=true` and the project's own external-processing opt-in are set. The hosted demo keeps AI off.
 
 ### Validation
 
@@ -459,6 +484,9 @@ Settings are environment variables with the `PATHGUARD_` prefix. They are define
 | `PATHGUARD_VISITOR_RETENTION_DAYS` | `7` | Visitor projects untouched this long are deleted |
 | `PATHGUARD_VISITOR_PROJECT_LIMIT` | `20` | Projects per browser in the public demo |
 | `PATHGUARD_STATIC_DIR` | unset | Serve a built web app from the API (set by the root `Dockerfile`) |
+| `PATHGUARD_AI_ENABLED` | `false` | Optional AI suggestions, called only on request |
+| `PATHGUARD_AI_BASE_URL` / `PATHGUARD_AI_MODEL` | `http://127.0.0.1:11434` / `qwen2.5:1.5b` | Ollama address and model. A non-local host counts as remote |
+| `PATHGUARD_AI_TIMEOUT_SECONDS`, `PATHGUARD_AI_MAX_INPUT_CHARS`, `PATHGUARD_AI_MAX_OUTPUT_TOKENS` | `120`, `6000`, `700` | Caps on each request |
 
 The Compose database password (`pathguard`) is a local-only demo value. The database port is bound to `127.0.0.1` only.
 
@@ -475,4 +503,4 @@ The Compose database password (`pathguard`) is a local-only demo value. The data
 8. Baseline vs mitigation comparison (done)
 9. Export and outcome logging (done)
 10. Verification and documentation (done)
-11. Optional AI suggestions (off by default; not built)
+11. Optional AI suggestions (done; off by default)

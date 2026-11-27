@@ -21,6 +21,8 @@ services:
         value: "7"
       - key: PATHGUARD_EXTERNAL_PROCESSING_ENABLED
         value: "false"
+      - key: PATHGUARD_AI_ENABLED  # no model runs on the free host; rules-only
+        value: "false"
       - key: PATHGUARD_CORS_ORIGINS
         value: "[]"
       - key: PATHGUARD_SECRET_KEY

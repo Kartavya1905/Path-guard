@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     static_dir: str | None = None
     # No project data leaves the machine unless this is switched on explicitly.
     external_processing_enabled: bool = False
+    # Optional AI suggestions: off by default. Runs only when a person asks for it.
+    ai_enabled: bool = False
+    ai_provider: Literal["ollama"] = "ollama"
+    ai_base_url: str = "http://127.0.0.1:11434"  # local Ollama; any other host counts as remote
+    ai_model: str = "qwen2.5:1.5b"
+    ai_timeout_seconds: float = 120  # a small local model on a CPU can take ~30–60 s
+    ai_max_input_chars: int = 6000
+    ai_max_output_tokens: int = 700
 
     @field_validator("database_url")
     @classmethod

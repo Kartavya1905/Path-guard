@@ -448,3 +448,19 @@ export const outcomesApi = {
   apply: (id: string, body: { transition_id: string; context: string[]; sibling_changes: { transition_id: string; new_probability: Estimate }[]; evidence_quality: string; revision: number }) =>
     request<GraphOut>('POST', `${rp(id)}/outcomes/apply`, body),
 }
+
+// --------------------------------------------------------------------------- optional AI
+
+export type AiStatus = { enabled: boolean; provider: string; model: string | null; local: boolean }
+export type AiResult = GraphOut & { added: string[]; rejected: string[]; cached: boolean; provider: string; model: string }
+
+export const aiApi = {
+  status: async (): Promise<AiStatus | null> => {
+    const res = await fetch('/api/health')
+    const body = (await res.json().catch(() => null)) as { ai?: AiStatus } | null
+    return body?.ai ?? null
+  },
+  /** Calls the model. Only ever triggered by an explicit click. */
+  suggest: (id: string, revision: number, focusNodeId: string | null) =>
+    request<AiResult>('POST', `/projects/${encodeURIComponent(id)}/ai/suggestions`, { revision, focus_node_id: focusNodeId }),
+}

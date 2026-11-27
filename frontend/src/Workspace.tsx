@@ -1,7 +1,7 @@
 import type { XYPosition } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
-  ApiError, analysisApi, api, explorerApi, mapApi, newMapId, type Analysis, type Explorer, type DraftOut, type GraphOut, type Me, type Readiness,
+  ApiError, aiApi, analysisApi, api, explorerApi, type AiStatus, mapApi, newMapId, type Analysis, type Explorer, type DraftOut, type GraphOut, type Me, type Readiness,
   type RiskCandidate, type Role, type ScenarioGraph, type Severity,
 } from './api'
 import {
@@ -66,6 +66,15 @@ export default function Workspace({ projectId }: Props) {
     return () => { live = false }
   }, [projectId, savedRevision])
 
+  // Optional AI: only shows when the server has it switched on. Never called automatically.
+  const [ai, setAi] = useState<AiStatus | null>(null)
+  const [aiNote, setAiNote] = useState<string[]>([])
+  useEffect(() => {
+    let live = true
+    aiApi.status().then((s) => { if (live) setAi(s) }, () => undefined)
+    return () => { live = false }
+  }, [])
+
   const graph = data?.graph
   const dirty = data !== null && JSON.stringify(data.graph) !== data.saved
   const role = data?.draft.role
@@ -119,6 +128,15 @@ export default function Workspace({ projectId }: Props) {
     if (needsClean() || !data) return
     applyServer(await mapApi.review(projectId, riskId, decision, modelBranch, data.revision))
     setNotice(decision === 'reject' ? 'Suggestion rejected.' : modelBranch ? 'Accepted, and its branch is now on the map.' : 'Suggestion accepted.')
+  })
+
+  const askAi = () => run(async () => {
+    if (needsClean() || !data) return
+    const focus = selection?.kind === 'node' ? selection.id : null
+    const out = await aiApi.suggest(projectId, data.revision, focus)
+    applyServer(out)
+    setNotice(`AI added ${out.added.length} suggestion(s) to review${out.rejected.length ? `, ${out.rejected.length} rejected` : ''}${out.cached ? ' (reused a stored reply, no new model call)' : ''}. They are hypotheses with no probability until you review them.`)
+    setAiNote(out.rejected)
   })
 
   const save = () => run(async () => {
@@ -237,6 +255,22 @@ export default function Workspace({ projectId }: Props) {
           onSelect={setSelection} onReview={review}
           onAdd={(risk) => { update((g) => ({ ...g, risks: [...g.risks, risk] })); setSelection({ kind: 'risk', id: risk.id }) }}
           selectedNode={selection?.kind === 'node' ? selection.id : null} />
+        {ai?.enabled && canEdit && !empty && (
+          <section className="panel-section" aria-labelledby="ai-h">
+            <h2 id="ai-h">AI suggestions <span className="tag">optional</span></h2>
+            <p className="muted small">
+              Asks {ai.local ? 'the local' : 'the remote'} model ({ai.model}) for hazards, missing steps and recoveries
+              {selection?.kind === 'node' ? ' around the selected step' : ' along the main path'}. It runs only when you click,
+              sends only nearby steps and constraints, and never gives numbers. Results join the review list above.
+            </p>
+            <button type="button" disabled={busy || dirty} onClick={askAi}>Suggest with AI</button>
+            {aiNote.length > 0 && (
+              <details className="small"><summary>Rejected from the model's reply ({aiNote.length})</summary>
+                <ul className="plain-list">{aiNote.map((r) => <li key={r}>{r}</li>)}</ul>
+              </details>
+            )}
+          </section>
+        )}
       </aside>
 
       <section className="center" aria-label="Scenario map">
@@ -416,7 +450,7 @@ function Suggestions(props: {
               <button type="button" className="risk-title" aria-pressed={selected}
                 onClick={() => props.onSelect(selected ? null : { kind: 'risk', id: r.id })}>
                 <span>{r.title}</span>
-                <span className="small muted">{r.category.replaceAll('_', ' ')}{r.origin === 'rule' ? ' · rule' : ''}</span>
+                <span className="small muted">{r.category.replaceAll('_', ' ')}{r.origin === 'rule' ? ' · rule' : r.origin === 'ai' ? ' · AI hypothesis' : ''}</span>
               </button>
               <div className="risk-meta">
                 {r.impact && <span className={`sev sev-${r.impact}`}>{r.impact}</span>}

@@ -8,7 +8,9 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
+from app.ai import is_local
 from app.api import router
+from app.api_ai import router as ai_router
 from app.api_reports import router as reports_router
 from app.config import get_settings
 from app.db import database_ready
@@ -47,6 +49,9 @@ def create_app() -> FastAPI:
             "visitor_retention_days": settings.visitor_retention_days
             if settings.visitor_identity_enabled else None,
             "external_processing": settings.external_processing_enabled,
+            "ai": {"enabled": settings.ai_enabled, "provider": settings.ai_provider,
+                   "model": settings.ai_model if settings.ai_enabled else None,
+                   "local": is_local(settings.ai_base_url)},
         }
         return JSONResponse(body, status_code=200 if db_ok else 503)
 
@@ -61,6 +66,7 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(reports_router)
+    app.include_router(ai_router)
     # Single-container hosting: serve the built web app after the API routes.
     if settings.static_dir and Path(settings.static_dir).is_dir():
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="web")

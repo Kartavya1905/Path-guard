@@ -163,3 +163,17 @@ class OutcomeRow(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     recorded_by: Mapped[str] = mapped_column(ID)
     created_at: Mapped[datetime] = _now()
+
+
+class AiCacheRow(Base):
+    """A stored model reply for one exact AI request (prompt version, provider, model, input)."""
+
+    __tablename__ = "ai_suggestion_cache"
+    project_id: Mapped[str] = mapped_column(
+        ID, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    cache_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(120))
+    prompt_version: Mapped[str] = mapped_column(String(40))
+    response: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = _now()

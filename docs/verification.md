@@ -7,7 +7,7 @@ Results of checks that were **actually run** on 2026-11-26. They were run on Win
 | Check | Command (from the folder shown) | Result |
 |---|---|---|
 | Backend lint | `backend`: `.\.venv\Scripts\python.exe -m ruff check .` | All checks passed |
-| Backend tests (engine and API, real Postgres) | `backend`: `.\.venv\Scripts\python.exe -m pytest` | **163 passed** |
+| Backend tests (engine and API, real Postgres) | `backend`: `.\.venv\Scripts\python.exe -m pytest` | **183 passed** (after Step 11) |
 | Migration from an empty database | included above (`tests/test_migrations.py`: drop schema → upgrade to head → downgrade to base → upgrade again) | passed |
 | Frontend lint | `frontend`: `npm run lint` | no problems |
 | Frontend type check | `frontend`: `npm run typecheck` | no errors |
@@ -35,6 +35,26 @@ The browser tests include `e2e/demo.spec.ts`, which runs the whole [demo script]
 - **Persistence and access:** revision conflicts, roles (owner, editor, reviewer, viewer, outsider), visitor isolation, cookie tampering, data expiry, the baseline staying unchanged, versions that can't be edited, an append-only audit trail.
 - **Export:** CSV escaping of user text and formula injection, draft vs reviewed labels, sign-off rules.
 - **Outcomes:** comparable vs excluded records, sparse data left unresolved, approval required, the explicit sibling rule, older estimates kept in a snapshot.
+
+## Optional AI suggestions (Step 11)
+
+- **Automated tests (fake provider, no model needed):** 20 tests. They cover:
+  - AI being off by default.
+  - A prompt that includes only nearby nodes and no estimates.
+  - Strict parsing: malformed JSON, numeric fields and text estimates are rejected.
+  - Unknown node IDs and duplicates being rejected.
+  - Suggestions joining the review queue with unknown likelihood.
+  - Accepting a recovery branch and analyzing it.
+  - Reuse of cached replies.
+  - Reads, edits and recalculation never calling the model.
+  - Timeouts and invalid output leaving the map unchanged.
+  - A remote model needing both the server switch and the project opt-in.
+- **Real local model:** Ollama `qwen2.5:1.5b` on this PC's CPU, through the Compose API, on a copy of the checkout launch focused on "Integration defect".
+  - A direct call took 30.8 s, with 417 prompt tokens and 363 output tokens.
+  - Through the API, with the model already loaded, the first request took 7.1 s. It added 2 suggested hazards, both with unknown likelihood, and rejected 1 recovery aimed at a final failure step.
+  - The next request took 2.6 s. Every item came back as a duplicate and was rejected. That request wasn't served from the cache, because the map had changed (new suggestions), so the input differed.
+  - Before raising the default timeout to 120 s, the very first call, which includes loading the model, timed out at 60 s and correctly left the map unchanged.
+- AI was switched back off afterwards, and all browser tests passed with it off.
 
 ## Responsiveness
 
