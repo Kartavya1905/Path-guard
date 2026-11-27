@@ -287,3 +287,28 @@ main.full.with-banner { height: calc(100vh - 3.25rem - 2.1rem); }
   .report table, .report svg { break-inside: avoid; }
   .report-status.draft::after { content: ' (not reviewed)'; }
 }
+
+/* ---------------------------------------------------------------- narrower screens */
+/* Laptops: slimmer side panels. */
+@media (max-width: 1280px) {
+  .workspace { grid-template-columns: 260px minmax(0, 1fr) 300px; }
+}
+/* Tablets: map first, then the details, then the plan and suggestions. */
+@media (max-width: 1000px) {
+  main.full, main.full.with-banner { height: auto; }
+  .workspace { display: flex; flex-direction: column; height: auto; }
+  .workspace .center { order: 1; }
+  .workspace .panel.right { order: 2; border-left: 0; border-top: 1px solid #dde1e7; }
+  .workspace .panel.left { order: 3; border-right: 0; border-top: 1px solid #dde1e7; }
+  .workspace .canvas { height: 65vh; flex: none; }
+  .workspace .canvas.scroll { height: auto; min-height: 50vh; }
+  .panel { overflow: visible; }
+  .toolbar-status { margin-left: 0; width: 100%; }
+}
+/* Phones: single column forms. */
+@media (max-width: 600px) {
+  .grid2, .change-row { grid-template-columns: 1fr; }
+  .page { padding: 1rem 0.75rem 5rem; }
+  .task-row .field:first-child { min-width: 0; }
+  .report { padding: 0.75rem; }
+}

@@ -1,6 +1,6 @@
 # Verification record
 
-Results of checks that were **actually run** on 2026-11-26. They were run on Windows 11 with Docker Desktop, Python 3.12, Node 26, and Playwright driving the installed Microsoft Edge.
+Results of checks that were **actually run** on 2026-11-26. The final full re-run came after all 12 steps. They were run on Windows 11 with Docker Desktop, Python 3.12, Node 26, and Playwright driving the installed Microsoft Edge.
 
 ## Automated checks
 
@@ -12,9 +12,12 @@ Results of checks that were **actually run** on 2026-11-26. They were run on Win
 | Frontend lint | `frontend`: `npm run lint` | no problems |
 | Frontend type check | `frontend`: `npm run typecheck` | no errors |
 | Production build | `frontend`: `npm run build` | built |
-| Browser tests, Vite dev server | `frontend`: `npm run test:e2e` | **11 passed** |
-| Browser tests, Docker Compose stack (port 3600) | `frontend`: `$env:PW_BASE_URL = "http://127.0.0.1:3600"; npm run test:e2e` | **11 passed** |
-| Browser tests, hosted image in visitor mode (port 8650) | see [hosting.md](hosting.md), "Try the hosted image locally" | **11 passed** |
+| Browser tests, Vite dev server | `frontend`: `npm run test:e2e` | **13 passed** |
+| Browser tests, Docker Compose stack (port 3600) | `frontend`: `$env:PW_BASE_URL = "http://127.0.0.1:3600"; npm run test:e2e` | **13 passed** |
+| Browser tests, hosted image in visitor mode on a **fresh, empty database** (port 8650) | see [hosting.md](hosting.md), "Try the hosted image locally" | **13 passed**. On start-up it ran migrations 0001 → 0002 → 0003, purged nothing, started in production / visitor mode with AI off |
+| Accessibility (axe-core, WCAG 2.1 A and AA) | part of `npm run test:e2e` (`e2e/a11y.spec.ts`) | **0 violations** on the projects list, new-project form (with validation errors), plan form, workspace (map, risk selected, link estimate editor, Worst cases, Versions, Outcomes) and report. A sanity run confirmed the scanner catches a planted violation |
+| Narrow screens | `e2e/a11y.spec.ts` | Phone width (375 px): no sideways scrolling on projects, new project, plan form or report. Tablet width (768 px): the workspace stacks the map first, then details, then plan and suggestions |
+| Dependency checks | `backend`: `.\.venv\Scripts\python.exe -m pip check`; `frontend`: `npm audit` | No broken requirements; 0 known vulnerabilities |
 
 The browser tests include `e2e/demo.spec.ts`, which runs the whole [demo script](demo.md):
 
@@ -66,11 +69,11 @@ Command: `backend`: `.\.venv\Scripts\python.exe scripts/perf_check.py`, with the
 
 | Case | Nodes | Links | Result | States explored | Generate | Save | Analysis | Worst cases | Report | Paths listed |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 5 tasks (API) | 17 | 28 | exact | 47 | 70 ms | 70 ms | 37 ms | 45 ms | 54 ms | — |
-| 10 tasks (API) | 28 | 45 | exact | 42 | 46 ms | 56 ms | 23 ms | 79 ms | 93 ms | — |
-| Fixture, 10 steps (engine) | 33 | 61 | exact | 71 | — | — | 4 ms | 1 ms | — | top 10, more not listed |
-| Fixture, 40 steps (engine) | 123 | 241 | exact | 281 | — | — | 12 ms | 5 ms | — | top 10, more not listed |
-| Fixture, 250 steps (engine) | 753 | 1501 | **partial** (depth limit 200 reached, reported) | 1378 | — | — | 101 ms | 70 ms | — | top 10, more not listed |
+| 5 tasks (API) | 17 | 28 | exact | 47 | 43 ms | 62 ms | 23 ms | 52 ms | 63 ms | — |
+| 10 tasks (API) | 28 | 45 | exact | 42 | 42 ms | 57 ms | 25 ms | 79 ms | 92 ms | — |
+| Fixture, 10 steps (engine) | 33 | 61 | exact | 71 | — | — | 7 ms | 2 ms | — | top 10, more not listed |
+| Fixture, 40 steps (engine) | 123 | 241 | exact | 281 | — | — | 15 ms | 5 ms | — | top 10, more not listed |
+| Fixture, 250 steps (engine) | 753 | 1501 | **partial** (depth limit 200 reached, reported) | 1378 | — | — | 137 ms | 114 ms | — | top 10, more not listed |
 
 Two performance fixes came out of this step:
 
@@ -81,4 +84,6 @@ Two performance fixes came out of this step:
 
 - **Human testing: pending.** See [pilot-plan.md](pilot-plan.md).
 - **The hosted site on Render and Neon:** waiting for the owner's accounts. The same image passed all browser tests locally in production / visitor mode.
-- **Other browsers:** only Edge (Chromium) was tested; Firefox and Safari weren't. There was no formal accessibility audit and no screen-reader test.
+- **Other browsers:** only Edge (Chromium) was tested; Firefox and Safari weren't. Running them would mean downloading Playwright's browser builds.
+- **Manual accessibility:** there has been no screen-reader or keyboard-only walkthrough. The automated axe scan finds only part of the possible issues.
+- **Known warning:** the backend test run shows one third-party deprecation warning (Starlette's test client and httpx). It doesn't affect PathGuard.

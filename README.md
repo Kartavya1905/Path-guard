@@ -82,7 +82,7 @@ docker compose down -v
 - **Real sign-in (OIDC):** not implemented. The public demo uses anonymous per-browser identity, which isn't authentication ([security.md](docs/security.md)).
 - **Range results:** these are outer bounds, with each estimate independent within its range, and can be wide. Exact results need point estimates.
 - **Outcome candidates:** these update one branch at a time. The other branches of a complete decision are entered by hand.
-- **Browser testing:** only Edge (Chromium) was tested. There has been no formal accessibility audit. The three-panel layout is meant for desktop screens.
+- **Browser testing:** only Edge (Chromium) was tested. An automated WCAG 2.1 AA scan finds no violations, but there's been no manual screen-reader or keyboard-only test. Narrow screens are supported: the workspace stacks on tablets and forms fit on phones, but it works best on a desktop.
 
 ## Scenario engine
 
