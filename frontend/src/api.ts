@@ -340,3 +340,29 @@ export type Analysis = {
 export const analysisApi = {
   get: (id: string) => request<Analysis>('GET', `/projects/${encodeURIComponent(id)}/analysis`),
 }
+
+// --------------------------------------------------------------------------- worst cases
+
+export type Likelihood = {
+  basis: 'modeled' | 'estimate' | 'unknown'; value: ProbValue | null; worst_case: string; note: string
+}
+export type CascadeStep = {
+  node_id: string; label: string; kind: string
+  via_outcome: string | null; via_trigger: string | null; probability: ProbValue | null
+}
+export type RiskView = {
+  id: string; title: string; category: string; trigger: string; consequence: string
+  review_status: ReviewStatus; origin: Origin; impact: Severity | null; affected_node_ids: string[]
+  likelihood: Likelihood
+  evidence: { strength: 'strong' | 'moderate' | 'weak' | 'anecdotal' | 'none'; count: number; titles: string[] }
+  rank: number; reasons: string[]; pinned_critical: boolean; modeled_branch: boolean
+  cascade: { steps: CascadeStep[]; ends_in: string; outcomes_if_it_happens: Record<string, ProbValue>; summary: string } | null
+}
+export type Explorer = {
+  risks: RiskView[]; total: number; excluded_rejected: number; analyzable: boolean
+  categories: string[]; order_note: string
+}
+
+export const explorerApi = {
+  get: (id: string) => request<Explorer>('GET', `/projects/${encodeURIComponent(id)}/explorer`),
+}

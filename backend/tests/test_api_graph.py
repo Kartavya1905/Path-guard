@@ -218,3 +218,19 @@ def test_analysis_of_a_fresh_map_is_partial(api):
     generate(api, pid, 1)
     out = api.get(f"/api/projects/{pid}/analysis", headers=PLANNER).json()
     assert out["status"] == "partial" and out["missing_estimates"]
+
+
+def test_worst_case_explorer_keeps_critical_risks_first(api):
+    pid, rev = checkout_project(api)
+    out = generate(api, pid, rev).json()
+    res = api.get(f"/api/projects/{pid}/explorer", headers=PLANNER)
+    assert res.status_code == 200, res.text
+    ex = res.json()
+    assert ex["risks"][0]["impact"] == "critical"
+    assert ex["risks"][0]["likelihood"]["basis"] == "unknown"
+    assert [r["rank"] for r in ex["risks"]] == list(range(1, len(ex["risks"]) + 1))
+    risk = ex["risks"][1]["id"]
+    review(api, pid, risk, out["revision"], decision="reject")
+    ex = api.get(f"/api/projects/{pid}/explorer", headers=PLANNER).json()
+    assert ex["excluded_rejected"] == 1 and risk not in [r["id"] for r in ex["risks"]]
+    assert api.get(f"/api/projects/{pid}/explorer", headers=OUTSIDER).status_code == 404

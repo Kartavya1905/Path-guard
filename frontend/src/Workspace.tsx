@@ -1,7 +1,7 @@
 import type { XYPosition } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
-  ApiError, analysisApi, api, mapApi, newMapId, type Analysis, type DraftOut, type GraphOut, type Me, type Readiness,
+  ApiError, analysisApi, api, explorerApi, mapApi, newMapId, type Analysis, type Explorer, type DraftOut, type GraphOut, type Me, type Readiness,
   type RiskCandidate, type Role, type ScenarioGraph, type Severity,
 } from './api'
 import {
@@ -10,6 +10,7 @@ import {
 import AnalysisPanel from './AnalysisPanel'
 import Inspector from './Inspector'
 import MapCanvas, { type Highlight, type Selection } from './MapCanvas'
+import WorstCases from './WorstCases'
 
 type Props = { projectId: string }
 type Loaded = { draft: DraftOut; graph: ScenarioGraph; saved: string; revision: number; readiness: Readiness }
@@ -46,6 +47,9 @@ export default function Workspace({ projectId }: Props) {
 
   // Probability analysis of the saved map, recalculated whenever the saved revision changes.
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
+  const [explorer, setExplorer] = useState<Explorer | null>(null)
+  const [explorerError, setExplorerError] = useState<string | null>(null)
+  const [centerView, setCenterView] = useState<'map' | 'worst'>('map')
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const savedRevision = data?.revision
   useEffect(() => {
@@ -54,6 +58,9 @@ export default function Workspace({ projectId }: Props) {
     analysisApi.get(projectId).then(
       (a) => { if (live) { setAnalysis(a); setAnalysisError(null) } },
       (e: Error) => { if (live) setAnalysisError(e.message) })
+    explorerApi.get(projectId).then(
+      (x) => { if (live) { setExplorer(x); setExplorerError(null) } },
+      (e: Error) => { if (live) setExplorerError(e.message) })
     return () => { live = false }
   }, [projectId, savedRevision])
 
@@ -144,7 +151,8 @@ export default function Workspace({ projectId }: Props) {
         branchCounts.set(t.source_node_id, (branchCounts.get(t.source_node_id) ?? 0) + 1)
       }
     }
-    return { shownNodes, shownEdges: new Set(edges.map((t) => t.id)), edges, hiddenCounts: counts, branchCounts, hiddenTotal: hidden.size }
+    const rejectedHidden = showRejected ? 0 : graph.nodes.filter((n) => n.review_status === 'rejected').length
+    return { shownNodes, shownEdges: new Set(edges.map((t) => t.id)), edges, hiddenCounts: counts, branchCounts, hiddenTotal: hidden.size, rejectedHidden }
   }, [graph, collapsed, showRejected])
 
   const highlight: Highlight | null = useMemo(() => {
@@ -232,6 +240,10 @@ export default function Workspace({ projectId }: Props) {
       <section className="center" aria-label="Scenario map">
         <div className="toolbar" role="toolbar" aria-label="Map actions">
           <strong className="toolbar-title">{plan.project.title}</strong>
+          <div className="segmented" role="group" aria-label="View">
+            <button type="button" aria-pressed={centerView === 'map'} onClick={() => setCenterView('map')}>Map</button>
+            <button type="button" aria-pressed={centerView === 'worst'} onClick={() => setCenterView('worst')}>Worst cases</button>
+          </div>
           {canEdit && (
             <button type="button" className={empty ? 'primary' : ''} disabled={busy} onClick={generate}>
               {empty ? 'Generate map' : 'Regenerate from plan'}
@@ -250,6 +262,7 @@ export default function Workspace({ projectId }: Props) {
           <span className="toolbar-status muted" role="status">
             {busy ? 'Working…' : dirty ? 'Unsaved map changes' : `Saved · revision ${data.revision}`}
             {view.hiddenTotal > 0 && ` · ${view.hiddenTotal} collapsed`}
+            {view.rejectedHidden > 0 && ` · ${view.rejectedHidden} rejected hidden`}
           </span>
           {canEdit && dirty && <button type="button" onClick={discard} disabled={busy}>Discard</button>}
           {canEdit && <button type="button" className="primary" onClick={save} disabled={busy || !dirty}>Save map</button>}
@@ -263,9 +276,12 @@ export default function Workspace({ projectId }: Props) {
         {error && !conflict && <p className="alert error banner" role="alert">{error}</p>}
         {notice && <p className="alert ok banner" role="status">{notice}</p>}
         {!canEdit && <p className="alert info banner">Your role ({role}) can view this map{canReview ? ' and review suggestions' : ''} but not edit it.</p>}
-        <Legend />
-        <div className="canvas">
-          {empty ? (
+        {centerView === 'map' && <Legend />}
+        <div className={centerView === 'map' ? 'canvas' : 'canvas scroll'}>
+          {centerView === 'worst' ? (
+            <WorstCases explorer={explorer} error={explorerError} stale={dirty}
+              onShow={(id) => { setSelection({ kind: 'risk', id }); setCenterView('map') }} />
+          ) : empty ? (
             <div className="empty-map">
               <h3>No scenario map yet</h3>
               <p className="muted">Generate one from your plan: start, tasks in dependency order, goal, plus suggested risks to review.</p>

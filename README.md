@@ -2,7 +2,7 @@
 
 A visual project risk planner. You enter a starting situation and a goal, and PathGuard builds an editable scenario map of success, failure, delay and recovery paths. It ranks risks and compares a safeguard against a saved baseline. Everything runs locally. It uses no paid services, credentials or external AI.
 
-> Status: **Step 6 (probability engine)**. Later steps are tracked in the plan below.
+> Status: **Step 7 (worst-case explorer)**. Later steps are tracked in the plan below.
 
 ## Scenario engine
 
@@ -67,6 +67,25 @@ A visual project risk planner. You enter a starting situation and a goal, and Pa
   - Transaction: the primary path is 81.144%.
 
 In the workspace, set an estimate in the right panel when a link is selected. Mark a decision complete there too, and see its total. Map links show their percentage, with "hyp." for hypothetical estimates. The **Probability** section in the left panel shows the results for the last saved map.
+
+### Worst-case explorer
+
+`explorer.py` ranks risks, and `GET /api/projects/{id}/explorer` returns the ranking (add `include_rejected=true` to include rejected risks). In the workspace, switch the centre panel from **Map** to **Worst cases**.
+
+- **Three separate measures:** likelihood, impact and strength of evidence are shown side by side and never blended into one score.
+  - **Likelihood** comes from the model if possible: the chance a run reaches the risk's accepted branch. Otherwise it comes from the risk's own estimate, or it is **unknown**. Nothing is guessed.
+  - **Evidence** is the best quality linked to the risk or its steps.
+- **Order:**
+  1. Impact, with critical first.
+  2. Worst-case likelihood: the upper bound, where unknown counts as "up to 100%".
+  3. Title.
+
+  So a critical risk with low or unknown likelihood stays at the top. Each risk says why it has its rank.
+- **Cascades:** for a risk whose branch is on the map, the explorer traces the most likely path from the risk to a bad end. On ties, for example with unknown estimates, it uses the shortest path. It also shows how runs end once the risk happens: goal, failure, retries exhausted or not modeled. **Show on map** selects the risk and highlights its causes and effects.
+- **Filters:** worst-case likelihood, impact, evidence quality, cause (category), and whether to include unreviewed suggestions.
+  - The likelihood and evidence filters never hide a critical-impact risk. The status line counts the critical risks kept visible this way.
+  - The status line says how many risks are shown, hidden by filters and rejected.
+  - On the map, the toolbar counts collapsed nodes and hidden rejected nodes.
 
 ### Validation
 

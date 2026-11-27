@@ -5,6 +5,7 @@ import FastAPI, SQLAlchemy or any model provider (see tests/test_engine_isolatio
 """
 
 from pathguard_engine.analysis import Analysis, analyze, check_groups
+from pathguard_engine.explorer import Explorer, explore
 from pathguard_engine.graph import Readiness, readiness, validate_graph
 from pathguard_engine.ids import new_id, stable_id
 from pathguard_engine.model import (
@@ -37,5 +38,5 @@ __all__ = [
     "Task", "Transition", "dependency_order", "find_cycle", "from_percent", "new_id",
     "stable_id", "to_percent", "validate_plan",
     "Generation", "Readiness", "build", "generate", "mark_edits", "readiness", "review_risk",
-    "validate_graph", "Analysis", "analyze", "check_groups",
+    "validate_graph", "Analysis", "analyze", "check_groups", "Explorer", "explore",
 ]

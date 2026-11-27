@@ -227,10 +227,13 @@ class _Run:
     missing: set[str] = field(default_factory=set)
     memo: dict = field(default_factory=dict)
     stack: set = field(default_factory=set)
+    stop_at: frozenset[str] = frozenset()  # reaching one of these ends the run as "hit"
 
     def visit(self, node_id: str, counts: tuple[tuple[str, int], ...],
               depth: int) -> dict[str, Interval]:
         node = self.m.nodes[node_id]
+        if node_id in self.stop_at:
+            return {"hit": (ONE, ONE)}
         if node.terminal:
             end = "goal" if node.kind == "goal" else \
                 "residual" if node.kind == "residual" else "failure"
@@ -384,3 +387,47 @@ def analyze(graph: ScenarioGraph, plan: Plan | None = None, *, max_depth: int = 
         status=eventual.status, first_pass=first_pass, eventual_success=eventual,
         outcomes=outcomes, groups=groups, missing_estimates=sorted(full.missing | first.missing),
         paths=paths, limits=limits, issues=unresolved)
+
+
+# --------------------------------------------------------------------------- per-node questions
+
+
+def _prepared(graph: ScenarioGraph) -> _Model | None:
+    """The analyzable model, or None when the map can't be analyzed yet."""
+    if any(i.severity == "error" for i in validate_graph(graph)):
+        return None
+    groups = check_groups(graph)
+    if any(g.status == "invalid" for g in groups):
+        return None
+    m = _model(graph)
+    m.unmodeled = {g.node_id: (g.unmodeled_low, g.unmodeled_high) for g in groups
+                   if g.unmodeled_high > 0}
+    return m
+
+
+def reach_probability(graph: ScenarioGraph, node_id: str, *, max_depth: int = 200,
+                      max_expansions: int = 20000) -> Value | None:
+    """Chance that a run reaches `node_id` at least once (None if not analyzable)."""
+    m = _prepared(graph)
+    if m is None or m.start is None or node_id not in m.nodes:
+        return None
+    run = _Run(m, success_only=False, max_depth=max_depth, max_expansions=max_expansions,
+               stop_at=frozenset({node_id}))
+    buckets = run.visit(m.start, (), 0)
+    hit = buckets.get("hit", (ZERO, ZERO))
+    partial = bool(run.missing) or run.truncated or buckets.get("unmodeled", (ZERO, ZERO))[1] > 0
+    return _value(*hit, partial,
+                  "Partial: missing estimates or unmodeled outcomes could change this."
+                  if partial else "")
+
+
+def outcomes_from(graph: ScenarioGraph, node_id: str, *, max_depth: int = 200,
+                  max_expansions: int = 20000) -> dict[str, Value] | None:
+    """How runs end once they reach `node_id` (attempt counts start fresh there)."""
+    m = _prepared(graph)
+    if m is None or node_id not in m.nodes:
+        return None
+    run = _Run(m, success_only=False, max_depth=max_depth, max_expansions=max_expansions)
+    buckets = run.visit(node_id, (), 0)
+    partial = bool(run.missing) or run.truncated or buckets.get("unmodeled", (ZERO, ZERO))[1] > 0
+    return {b: _value(*buckets[b], partial) for b in BUCKETS if b in buckets}

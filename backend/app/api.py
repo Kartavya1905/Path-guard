@@ -42,6 +42,7 @@ from app.schemas import (
 )
 from pathguard_engine import (
     Analysis,
+    Explorer,
     Plan,
     Prerequisite,
     Project,
@@ -50,6 +51,7 @@ from pathguard_engine import (
     ScenarioVersion,
     Task,
     analyze,
+    explore,
     generate,
     mark_edits,
     new_id,
@@ -314,6 +316,14 @@ def analyze_graph(project_id: str, session: SessionDep, user: UserDep,
     row, _ = project_access(session, user, project_id, "read")
     return analyze(ScenarioGraph.model_validate(row.graph), _load_plan(session, row),
                    max_depth=max_depth, max_expansions=max_expansions, max_results=max_results)
+
+
+@router.get("/projects/{project_id}/explorer", response_model=Explorer)
+def worst_cases(project_id: str, session: SessionDep, user: UserDep,
+                include_rejected: bool = False) -> Explorer:
+    """Risks ranked by impact, then worst-case likelihood, with modeled cascades."""
+    row, _ = project_access(session, user, project_id, "read")
+    return explore(ScenarioGraph.model_validate(row.graph), include_rejected=include_rejected)
 
 
 # --------------------------------------------------------------------------- versions

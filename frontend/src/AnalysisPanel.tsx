@@ -21,6 +21,7 @@ function Prob({ v }: { v: ProbValue | null | undefined }) {
     return <span title={`Exactly ${pctExact(v.value)}`}>{pct1(v.value)} <span className="muted small">(exact {pctExact(v.value)})</span></span>
   }
   if (v.status === 'bounds') return <span>{pctExact(v.low)} – {pctExact(v.high)}</span>
+  if (Number(v.low) === 0) return <span>unknown <span className="muted small">(partial: estimates missing)</span></span>
   return <span>at least {pctExact(v.low)} <span className="muted small">(partial)</span></span>
 }
 

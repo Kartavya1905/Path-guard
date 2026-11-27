@@ -133,3 +133,28 @@ test('estimates drive the probability panel: exact, then a range', async ({ page
   await expect(panel).toContainText('10%–20% of outcomes are not modeled')
   await expect(page.locator('.react-flow__edge-text').first()).toContainText('80–90% hyp.')
 })
+
+test('worst cases: critical stays visible, cascades are traced, show on map', async ({ page }) => {
+  const id = await checkoutProject(page.request)
+  await generate(page, id)
+  await page.locator('.risk-title', { hasText: 'Release defect or failed rollback' }).click()
+  await details(page).getByRole('button', { name: 'Accept and add branch' }).click()
+  await expect(page.getByText('Accepted, and its branch is now on the map.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Worst cases', exact: true }).click()
+  const first = page.locator('.worst-list > li').first()
+  await expect(first).toContainText('#1')
+  await expect(first).toContainText('Release defect or failed rollback')
+  await expect(first).toContainText('critical')
+  await expect(first.locator('.cascade')).toContainText('Release defect needs rollback')
+
+  // A strict likelihood filter hides the rest, but never the critical risk.
+  await page.getByLabel('Evidence at least').selectOption('strong')
+  await expect(page.getByText(/critical kept visible despite the filters/)).toBeVisible()
+  await expect(page.locator('.worst-list > li')).toHaveCount(1)
+  await expect(page.getByText(/hidden by filters/)).toBeVisible()
+
+  await first.getByRole('button', { name: 'Show on map' }).click()
+  await expect(details(page)).toContainText('Release defect or failed rollback')
+  await expect(page.locator('.map-node.role-effect').first()).toBeVisible()
+})
