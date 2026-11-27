@@ -290,3 +290,37 @@ def test_create_variant_from_a_baseline(api):
         ).status_code
         == 404
     )
+
+
+def test_invalid_evidence_input_is_rejected(api):
+    pid = create(api)["plan"]["project"]["id"]
+    out = generate(api, pid, 1).json()
+    graph = out["graph"]
+    good = {
+        "id": "evd_test000001",
+        "title": "Gateway report",
+        "kind": "dataset",
+        "quality": "strong",
+    }
+    for bad in (
+        {"quality": "excellent"},
+        {"kind": "rumour"},
+        {"sample_size": 0},
+        {"title": ""},
+        {"surprise": "field"},
+    ):
+        body = {"graph": {**graph, "evidence": [good | bad]}, "revision": out["revision"]}
+        res = api.put(f"/api/projects/{pid}/graph", json=body, headers=PLANNER)
+        assert res.status_code == 422, bad
+    # A link to evidence that doesn't exist saves, but is reported as a broken reference.
+    link = {
+        "id": "evl_test000001",
+        "evidence_id": "evd_missing0001",
+        "target_kind": "node",
+        "target_id": graph["nodes"][0]["id"],
+    }
+    body = {"graph": {**graph, "evidence_links": [link]}, "revision": out["revision"]}
+    res = api.put(f"/api/projects/{pid}/graph", json=body, headers=PLANNER)
+    assert res.status_code == 200
+    codes = {i["code"] for i in res.json()["readiness"]["issues"]}
+    assert "dangling_reference" in codes and not res.json()["readiness"]["can_analyze"]

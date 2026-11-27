@@ -2,7 +2,87 @@
 
 A visual project risk planner. You enter a starting situation and a goal, and PathGuard builds an editable scenario map of success, failure, delay and recovery paths. It ranks risks and compares a safeguard against a saved baseline. Everything runs locally. It uses no paid services, credentials or external AI.
 
-> Status: **Step 9 (export and outcome logging)**. Later steps are tracked in the plan below.
+> Status: **Steps 0–10 complete** (verified; see [docs/verification.md](docs/verification.md)). Step 11, optional AI suggestions, is not built. Human pilot testing is **pending**.
+
+## Quick start (Windows, PowerShell)
+
+Run these from the `pathguard` folder:
+
+```powershell
+docker compose up -d --build
+```
+
+Open http://localhost:3600. The two checkout examples are already there (all their numbers are hypothetical). Follow [docs/demo.md](docs/demo.md) for a 10-minute walkthrough.
+
+Run every check. The Compose stack must be running. These first two commands run from `backend`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff check .
+```
+
+Then these from `frontend`:
+
+```powershell
+npm run lint; npm run typecheck; npm run build
+```
+
+```powershell
+npm run test:e2e
+```
+
+Reset everything, including the local database (**this deletes all local data**). The seed recreates the examples on the next start:
+
+```powershell
+docker compose down -v
+```
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | How the engine, API, database and web app fit together, and how runs are counted |
+| [docs/demo.md](docs/demo.md) | Demo script: create, review, inspect estimates, compare, persist, export, log an outcome |
+| [docs/verification.md](docs/verification.md) | Checks actually run, with results and responsiveness timings |
+| [docs/pilot-plan.md](docs/pilot-plan.md) | Pilot with designers and project managers across three workflows (pending) |
+| [docs/security.md](docs/security.md) | Local protections, and what hosting for real teams would require |
+| [docs/hosting.md](docs/hosting.md) | Free public demo on Render + Neon |
+
+## Features
+
+- **Plan:** only a start and a goal are required. Optional tasks, prerequisites (with cycle and order checks) and context. Display order is kept separate from dependency order.
+- **Rule engine:** generates the map. Checkout template and generic rules (missing prerequisites, conflicting order, approvals, handoffs, resources, deadline, budget) produce suggestions you can review. Each has a type, trigger, affected step, rationale, consequence and mitigation, and no probability. Regenerating keeps your decisions and edits.
+- **Map validation:** dangling references, start and goal problems, unreachable goals and nodes, dead ends, unbounded or exitless loops, retry limits with nowhere to go, ungrouped branches, and a map order that conflicts with prerequisites. Incomplete drafts still save, with clear messages.
+- **Workspace:**
+  - The plan, map checks, probability and suggestions on the left.
+  - A React Flow map in the centre: pan, zoom, fit, collapse, editing, and outcome labels plus line styles, not just colour.
+  - An inspector on the right: trigger, estimates and their sources, severity, affected steps, notes, evidence, assumptions and mitigations.
+  - Risk cause and effect highlighting.
+  - Loading, empty, error and conflict states.
+- **Probability engine:**
+  - Exact decimals: point, range or unknown estimates with provenance and verification.
+  - Decision checks: complete groups total exactly 100%, and nothing is normalized.
+  - Clean first-pass vs eventual success, with bounded retries and no double counting.
+  - Results are exact, bounds or partial. Limits are reported.
+- **Worst-case explorer:** impact first, then worst-case likelihood, so critical risks stay visible. Likelihood, impact and evidence are shown separately. Rank explanations, cascades, filters.
+- **Versions:** immutable hashed versions. Mitigation variants are built on the server, and broken totals require explicit sibling changes. The comparison gives percentage-point deltas only when both sides are exact, and flags differences in coverage and unresolved inputs.
+- **Export:** printable report (save as PDF) and a CSV risk register with formula protection. Drafts are labeled, and "reviewed" requires a reviewer's sign-off.
+- **Outcomes:** logging tied to a version and a decision. Estimate candidates use comparable data only, and sparse data stays unresolved. Applying one needs a reviewer, and the old map is snapshotted first.
+- **Access and safety:** project roles, revision conflicts, one transaction per request, append-only audit trail and write-once tables. Local demo identity is off in production. The public demo gives each browser its own anonymous account, with expiry.
+- **Runtime AI:** none. Every calculation, generation, ranking, comparison and export is local, using zero LLM tokens.
+
+## Remaining gaps
+
+- **Human pilot testing:** pending ([plan](docs/pilot-plan.md)).
+- **Step 11, optional AI suggestions:** not built. The core workflow doesn't need it.
+- **Hosted demo:** ready, but waiting for the Render and Neon accounts.
+- **Real sign-in (OIDC):** not implemented. The public demo uses anonymous per-browser identity, which isn't authentication ([security.md](docs/security.md)).
+- **Range results:** these are outer bounds, with each estimate independent within its range, and can be wide. Exact results need point estimates.
+- **Outcome candidates:** these update one branch at a time. The other branches of a complete decision are entered by hand.
+- **Browser testing:** only Edge (Chromium) was tested. There has been no formal accessibility audit. The three-panel layout is meant for desktop screens.
 
 ## Scenario engine
 
@@ -384,15 +464,15 @@ The Compose database password (`pathguard`) is a local-only demo value. The data
 
 ## Implementation plan
 
-0. Scaffold
-1. Schemas and scenario engine core
-2. Persistence, migrations, access control
-3. Project form UI and smoke test
-4. Rule engine and graph validation
-5. Three-panel workspace
-6. Probability engine
-7. Worst-case explorer
-8. Baseline vs mitigation comparison
-9. Export and outcome logging
-10. Verification and documentation
-11. Optional AI suggestions (off by default)
+0. Scaffold (done)
+1. Schemas and scenario engine core (done)
+2. Persistence, migrations, access control (done)
+3. Project form UI and smoke test (done)
+4. Rule engine and graph validation (done)
+5. Three-panel workspace (done)
+6. Probability engine (done)
+7. Worst-case explorer (done)
+8. Baseline vs mitigation comparison (done)
+9. Export and outcome logging (done)
+10. Verification and documentation (done)
+11. Optional AI suggestions (off by default; not built)

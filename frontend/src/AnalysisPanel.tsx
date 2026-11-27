@@ -79,7 +79,7 @@ export default function AnalysisPanel(props: {
 
           {a.paths.length > 0 && (
             <details className="small">
-              <summary>Most likely paths ({a.limits.paths_shown} of {a.limits.paths_found})</summary>
+              <summary>Most likely paths (top {a.limits.paths_shown}{a.limits.path_search_truncated ? ', more not listed' : ''})</summary>
               <p className="muted">Examples only. The totals above come from the full calculation, not from adding these paths.</p>
               <ol className="plain-list numbered">
                 {a.paths.map((p) => (
@@ -94,8 +94,7 @@ export default function AnalysisPanel(props: {
           <p className="muted small">
             Limits: depth {a.limits.max_depth}, {a.limits.expansions_used} of {a.limits.max_expansions} states explored
             {a.limits.truncated ? ' (limit reached: results are partial)' : ''}
-            {a.limits.paths_omitted > 0 ? `, ${a.limits.paths_omitted} lower-probability paths not listed` : ''}
-            {a.limits.path_search_truncated ? ', path list cut off by limits' : ''}.
+            {a.limits.path_search_truncated ? ', less likely paths not listed' : ''}.
           </p>
           <details className="small">
             <summary>How this is calculated</summary>

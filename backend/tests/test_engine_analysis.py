@@ -13,8 +13,14 @@ def est(kind: str, *vals: str) -> Estimate:
         return Estimate.hypothetical(vals[0], "test")
     if kind == "range":
         e = Estimate.hypothetical("50", "test")
-        return e.model_copy(update={"kind": "range", "value": None,
-                                    "low": D(vals[0]) / 100, "high": D(vals[1]) / 100})
+        return e.model_copy(
+            update={
+                "kind": "range",
+                "value": None,
+                "low": D(vals[0]) / 100,
+                "high": D(vals[1]) / 100,
+            }
+        )
     return Estimate()
 
 
@@ -22,15 +28,19 @@ def gate(success: str, failure: str, *, complete: bool = True) -> ScenarioGraph:
     """start -> s, then a decision at s: success to the goal, failure to an end state."""
     g = group("s").model_copy(update={"complete": complete})
     return ScenarioGraph(
-        nodes=[node("st", "start"), node("s"), node("g", "goal"),
-               node("f", "failure", terminal=True)],
+        nodes=[
+            node("st", "start"),
+            node("s"),
+            node("g", "goal"),
+            node("f", "failure", terminal=True),
+        ],
         transitions=[
             link("st", "s", probability=est("point", "100")),
             link("s", "g", probability=est(*success.split(":")), decision_group_id=g.id),
-            link("s", "f", "failure", probability=est(*failure.split(":")),
-                 decision_group_id=g.id),
+            link("s", "f", "failure", probability=est(*failure.split(":")), decision_group_id=g.id),
         ],
-        decision_groups=[g])
+        decision_groups=[g],
+    )
 
 
 def gate_check(a):
@@ -112,8 +122,9 @@ def test_infeasible_ranges_are_rejected():
 
 def test_non_exclusive_group_blocks_analysis():
     g = gate("point:85", "point:15")
-    g = g.model_copy(update={"decision_groups": [
-        g.decision_groups[0].model_copy(update={"exclusive": False})]})
+    g = g.model_copy(
+        update={"decision_groups": [g.decision_groups[0].model_copy(update={"exclusive": False})]}
+    )
     assert analyze(g).status == "blocked"
 
 
@@ -123,8 +134,7 @@ def test_structural_errors_block_analysis():
 
 
 def test_single_link_needs_an_estimate():
-    g = ScenarioGraph(nodes=[node("st", "start"), node("g", "goal")],
-                      transitions=[link("st", "g")])
+    g = ScenarioGraph(nodes=[node("st", "start"), node("g", "goal")], transitions=[link("st", "g")])
     a = analyze(g)
     assert a.status == "partial" and a.eventual_success.low == 0
 
@@ -135,18 +145,32 @@ def test_single_link_needs_an_estimate():
 def retry_graph(limit: int | None = 1) -> ScenarioGraph:
     gs, gf = group("s"), group("f", "h")
     return ScenarioGraph(
-        nodes=[node("st", "start"), node("s"), node("f", "failure"), node("g", "goal"),
-               node("x", "failure", terminal=True)],
+        nodes=[
+            node("st", "start"),
+            node("s"),
+            node("f", "failure"),
+            node("g", "goal"),
+            node("x", "failure", terminal=True),
+        ],
         transitions=[
             link("st", "s", probability=est("point", "100")),
             link("s", "g", probability=est("point", "85"), decision_group_id=gs.id),
             link("s", "f", "failure", probability=est("point", "15"), decision_group_id=gs.id),
-            link("f", "s", "recovery", probability=est("point", "80"), decision_group_id=gf.id,
-                 max_traversals=limit),
+            link(
+                "f",
+                "s",
+                "recovery",
+                probability=est("point", "80"),
+                decision_group_id=gf.id,
+                max_traversals=limit,
+            ),
             link("f", "x", "failure", probability=est("point", "20"), decision_group_id=gf.id),
         ],
-        decision_groups=[gs.model_copy(update={"complete": True}),
-                         gf.model_copy(update={"complete": True})])
+        decision_groups=[
+            gs.model_copy(update={"complete": True}),
+            gf.model_copy(update={"complete": True}),
+        ],
+    )
 
 
 def test_bounded_retry_is_counted_per_run():
@@ -173,8 +197,7 @@ def test_depth_limit_truncates_and_is_reported():
 def test_reconverging_paths_are_not_double_counted():
     gs = group("s").model_copy(update={"complete": True})
     g = ScenarioGraph(
-        nodes=[node("st", "start"), node("s"), node("a"), node("b", "delay"),
-               node("g", "goal")],
+        nodes=[node("st", "start"), node("s"), node("a"), node("b", "delay"), node("g", "goal")],
         transitions=[
             link("st", "s", probability=est("point", "100")),
             link("s", "a", probability=est("point", "70"), decision_group_id=gs.id),
@@ -182,7 +205,8 @@ def test_reconverging_paths_are_not_double_counted():
             link("a", "g", probability=est("point", "100")),
             link("b", "g", probability=est("point", "100")),
         ],
-        decision_groups=[gs])
+        decision_groups=[gs],
+    )
     a = analyze(g)
     assert a.eventual_success.value == 1
     assert a.first_pass.value == D("0.7")  # the delayed path is not clean first-pass
@@ -190,4 +214,33 @@ def test_reconverging_paths_are_not_double_counted():
 
 def test_result_count_limit_reports_omitted_paths():
     a = analyze(checkout_launch()[1], max_results=2)
-    assert len(a.paths) == 2 and a.limits.paths_omitted == a.limits.paths_found - 2
+    full = analyze(checkout_launch()[1], max_results=100)
+    assert len(a.paths) == 2 and a.limits.path_search_truncated
+    assert [p.transitions for p in a.paths] == [p.transitions for p in full.paths[:2]]
+    probs = [p.probability.value for p in full.paths]
+    assert probs == sorted(probs, reverse=True)  # best first
+
+
+# --------------------------------------------------------------------------- larger maps
+
+
+def test_ten_step_branching_map_is_exact_within_default_limits():
+    from pathguard_engine.fixtures import branching_map
+
+    a = analyze(branching_map(10, retries=2))
+    assert a.status == "exact" and not a.limits.truncated
+    assert sum((v.value for v in a.outcomes.values()), D(0)) == 1
+    assert a.limits.expansions_used < 100  # loop counters are dropped once a loop is left
+    assert a.limits.path_search_truncated  # only the top paths are listed, and that is reported
+
+
+def test_large_branching_map_reports_truncation():
+    from pathguard_engine.fixtures import branching_map
+
+    big = analyze(branching_map(40, retries=2))
+    assert big.status == "exact"  # the full calculation still finishes
+    assert big.limits.path_search_truncated  # but the path list is cut off, and says so
+    tight = analyze(branching_map(40, retries=2), max_expansions=100)
+    assert tight.limits.truncated and tight.status == "partial"
+    assert tight.eventual_success.value is None and "limit" in tight.eventual_success.note
+    assert "truncated" in tight.outcomes

@@ -17,6 +17,7 @@ Rules (see README "Probability engine"):
 Pure Python + Decimal; no I/O.
 """
 
+import heapq
 from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -24,7 +25,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from pathguard_engine.graph import modeled, validate_graph
+from pathguard_engine.graph import _cycles, modeled, validate_graph
 from pathguard_engine.model import Plan, ScenarioGraph, ScenarioNode, Transition
 from pathguard_engine.plan import Issue
 
@@ -90,8 +91,8 @@ class Limits(BaseModel):
     truncated: bool
     paths_found: int
     paths_shown: int
-    paths_omitted: int
-    path_search_truncated: bool
+    paths_omitted: int  # kept for compatibility; the best-first search lists what it finds
+    path_search_truncated: bool  # more (less likely) paths exist than are listed
 
 
 class Analysis(BaseModel):
@@ -141,6 +142,22 @@ class _Model:
     unmodeled: dict[str, Interval]  # per decision node, from group checks
     start: str | None
     goal_ids: set[str]
+    loop_of: dict[str, int] = field(default_factory=dict)  # node -> loop (SCC) index
+
+    def keep_counts(self, counts: dict[str, int], node_id: str) -> tuple[tuple[str, int], ...]:
+        """Attempt counts that still matter at `node_id`.
+
+        A run that leaves a loop (strongly connected component) can never come back to
+        it, so the counts for that loop's links can be dropped. This keeps results exact
+        while stopping the number of run states from multiplying across loops.
+        """
+        loop = self.loop_of.get(node_id)
+        if loop is None:
+            return ()
+        return tuple(sorted((tid, c) for tid, c in counts.items()
+                            if self.loop_of.get(self.link_source[tid]) == loop))
+
+    link_source: dict[str, str] = field(default_factory=dict)
 
 
 def _model(graph: ScenarioGraph) -> _Model:
@@ -150,8 +167,10 @@ def _model(graph: ScenarioGraph) -> _Model:
         if modeled(t) and t.source_node_id in nodes and t.target_node_id in nodes:
             out[t.source_node_id].append(t)
     starts = [n.id for n in nodes.values() if n.kind == "start"]
+    loop_of = {nid: i for i, comp in enumerate(_cycles(nodes.keys(), out)) for nid in comp}
     return _Model(nodes, out, {}, starts[0] if len(starts) == 1 else None,
-                  {n.id for n in nodes.values() if n.kind == "goal"})
+                  {n.id for n in nodes.values() if n.kind == "goal"}, loop_of,
+                  {t.id: t.source_node_id for ts in out.values() for t in ts})
 
 
 # --------------------------------------------------------------------------- decisions
@@ -259,9 +278,8 @@ class _Run:
             if t.max_traversals is not None and used.get(t.id, 0) >= t.max_traversals:
                 child = {"retries_exhausted": (ONE, ONE)}
             else:
-                nxt = counts
-                if t.max_traversals is not None:
-                    nxt = tuple(sorted({**used, t.id: used.get(t.id, 0) + 1}.items()))
+                bumped = {**used, t.id: used.get(t.id, 0) + 1} if t.max_traversals else used
+                nxt = self.m.keep_counts(bumped, t.target_node_id)
                 child = self.visit(t.target_node_id, nxt, depth + 1)
             for bucket, (lo, hi) in child.items():
                 acc[bucket][0] += iv[0] * lo
@@ -278,46 +296,55 @@ class _Run:
 
 
 def _paths(m: _Model, max_depth: int, max_expansions: int, max_results: int):
-    found: list[PathResult] = []
-    tmap = {t.id: t for ts in m.out.values() for t in ts}
-    expansions = 0
-    truncated = False
-    total = 0
+    """The most likely complete paths, best first.
 
-    def walk(node_id, counts, nodes, trans, lo, hi, partial):
-        nonlocal expansions, truncated, total
-        node = m.nodes[node_id]
-        if node.terminal:
-            end = "goal" if node.kind == "goal" else \
-                "residual" if node.kind == "residual" else "failure"
-            record(end, nodes, trans, lo, hi, partial)
-            return
-        if len(trans) >= max_depth or expansions >= max_expansions:
-            truncated = True
-            return
+    Probabilities only shrink as a path grows, so popping partial paths by their upper
+    bound returns complete paths in order: the first `max_results` found are the top
+    ones. Returns (paths, number found, whether more paths exist or a limit was hit).
+    """
+    tmap = {t.id: t for ts in m.out.values() for t in ts}
+    found: list[PathResult] = []
+    if not m.start:
+        return found, 0, False
+    seq = 0
+    # (-high, -low, order, node, counts, nodes, links, low, high, partial, end-or-None)
+    heap: list = [(-ONE, -ONE, seq, m.start, (), (m.start,), (), ONE, ONE, False, None)]
+    expansions = 0
+    limited = False
+
+    def push(node, counts, nodes, links, lo, hi, partial, end):
+        nonlocal seq
+        seq += 1
+        heapq.heappush(heap, (-hi, -lo, seq, node, counts, nodes, links, lo, hi, partial, end))
+
+    while heap and len(found) < max_results:
+        _, _, _, node_id, counts, nodes, links, lo, hi, partial, end = heapq.heappop(heap)
+        if end is not None:
+            found.append(PathResult(
+                transitions=list(links), nodes=list(nodes),
+                labels=[m.nodes[n].label for n in nodes], probability=_value(lo, hi, partial),
+                ends_in=end, uses_recovery=any(tmap[t].outcome == "recovery" for t in links)))
+            continue
+        if len(links) >= max_depth or expansions >= max_expansions:
+            limited = True
+            continue
         expansions += 1
+        used = dict(counts)
         for t in m.out.get(node_id, []):
             iv = interval(t)
             p_lo, p_hi, part = (iv[0], iv[1], partial) if iv else (ZERO, ONE, True)
-            if t.max_traversals is not None and counts.get(t.id, 0) >= t.max_traversals:
-                record("retries_exhausted", nodes, [*trans, t.id], lo * p_lo, hi * p_hi, part)
+            nlo, nhi = lo * p_lo, hi * p_hi
+            if t.max_traversals is not None and used.get(t.id, 0) >= t.max_traversals:
+                push(node_id, counts, nodes, (*links, t.id), nlo, nhi, part, "retries_exhausted")
                 continue
-            nxt = {**counts, t.id: counts.get(t.id, 0) + 1} if t.max_traversals else counts
-            walk(t.target_node_id, nxt, [*nodes, t.target_node_id], [*trans, t.id],
-                 lo * p_lo, hi * p_hi, part)
-
-    def record(end, nodes, trans, lo, hi, partial):
-        nonlocal total
-        total += 1
-        found.append(PathResult(
-            transitions=trans, nodes=nodes, labels=[m.nodes[n].label for n in nodes],
-            probability=_value(lo, hi, partial), ends_in=end,
-            uses_recovery=any(tmap[t].outcome == "recovery" for t in trans)))
-
-    if m.start:
-        walk(m.start, {}, [m.start], [], ONE, ONE, False)
-    found.sort(key=lambda p: (p.probability.high, p.probability.low), reverse=True)
-    return found[:max_results], total, truncated
+            target = m.nodes[t.target_node_id]
+            bumped = {**used, t.id: used.get(t.id, 0) + 1} if t.max_traversals else used
+            ends = None
+            if target.terminal:
+                ends = {"goal": "goal", "residual": "residual"}.get(target.kind, "failure")
+            push(target.id, m.keep_counts(bumped, target.id), (*nodes, target.id),
+                 (*links, t.id), nlo, nhi, part, ends)
+    return found, len(found), limited or bool(heap)
 
 
 # --------------------------------------------------------------------------- entry point
@@ -376,11 +403,10 @@ def analyze(graph: ScenarioGraph, plan: Plan | None = None, *, max_depth: int = 
     first_pass = _value(*fp_goal, fp_partial,
                         "Partial: a success link on the way has no estimate." if fp_partial else "")
 
-    paths, found, path_trunc = _paths(m, max_depth, max_expansions, max_results)
+    paths, found, more = _paths(m, max_depth, max_expansions, max_results)
     limits = Limits(max_depth=max_depth, max_expansions=max_expansions, max_results=max_results,
                     expansions_used=full.expansions, truncated=full.truncated, paths_found=found,
-                    paths_shown=len(paths), paths_omitted=max(0, found - len(paths)),
-                    path_search_truncated=path_trunc)
+                    paths_shown=len(paths), paths_omitted=0, path_search_truncated=more)
     unresolved = [Issue(code="decision_unresolved", severity="warning", message=g.message,
                         refs=[g.node_id] + g.missing) for g in groups if g.status == "unresolved"]
     return Analysis(
