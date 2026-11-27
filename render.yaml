@@ -1,0 +1,29 @@
+# Render Blueprint: one free web service built from ./Dockerfile.
+# The database is a free Neon Postgres; paste its connection string when Render asks
+# for PATHGUARD_DATABASE_URL. See docs/hosting.md.
+services:
+  - type: web
+    name: pathguard
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PATHGUARD_ENV
+        value: production
+      - key: PATHGUARD_DEMO_IDENTITY_ENABLED
+        value: "false"
+      - key: PATHGUARD_VISITOR_IDENTITY_ENABLED
+        value: "true"
+      - key: PATHGUARD_VISITOR_RETENTION_DAYS
+        value: "7"
+      - key: PATHGUARD_EXTERNAL_PROCESSING_ENABLED
+        value: "false"
+      - key: PATHGUARD_CORS_ORIGINS
+        value: "[]"
+      - key: PATHGUARD_SECRET_KEY
+        generateValue: true
+      - key: PATHGUARD_DATABASE_URL
+        sync: false
