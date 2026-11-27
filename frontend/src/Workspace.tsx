@@ -1,12 +1,13 @@
 import type { XYPosition } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
-  ApiError, api, mapApi, newMapId, type DraftOut, type GraphOut, type Me, type Readiness,
+  ApiError, analysisApi, api, mapApi, newMapId, type Analysis, type DraftOut, type GraphOut, type Me, type Readiness,
   type RiskCandidate, type Role, type ScenarioGraph, type Severity,
 } from './api'
 import {
   collapsedHidden, isModeled, mainPath, riskTrace, shownTransitions, trace, STATUS_LABEL,
 } from './graphUtil'
+import AnalysisPanel from './AnalysisPanel'
 import Inspector from './Inspector'
 import MapCanvas, { type Highlight, type Selection } from './MapCanvas'
 
@@ -42,6 +43,19 @@ export default function Workspace({ projectId }: Props) {
     mapApi.me().then((m) => { if (live) setMe(m) }, () => undefined)
     return () => { live = false }
   }, [fetchAll, show])
+
+  // Probability analysis of the saved map, recalculated whenever the saved revision changes.
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const savedRevision = data?.revision
+  useEffect(() => {
+    if (savedRevision === undefined) return
+    let live = true
+    analysisApi.get(projectId).then(
+      (a) => { if (live) { setAnalysis(a); setAnalysisError(null) } },
+      (e: Error) => { if (live) setAnalysisError(e.message) })
+    return () => { live = false }
+  }, [projectId, savedRevision])
 
   const graph = data?.graph
   const dirty = data !== null && JSON.stringify(data.graph) !== data.saved
@@ -196,16 +210,19 @@ export default function Workspace({ projectId }: Props) {
   if (!data || !graph || !view) return <section className="page"><p className="muted" role="status">Loading the workspace…</p></section>
 
   const plan = data.draft.plan
+  const pick = (ref: string) => {
+    if (graph.nodes.some((n) => n.id === ref)) setSelection({ kind: 'node', id: ref })
+    else if (graph.transitions.some((t) => t.id === ref)) setSelection({ kind: 'transition', id: ref })
+  }
   const empty = graph.nodes.length === 0
 
   return (
     <div className="workspace">
       <aside className="panel left" aria-label="Project and suggestions">
         <PlanSummary draft={data.draft} projectId={projectId} />
-        <Checks readiness={data.readiness} onPick={(ref) => {
-          if (graph.nodes.some((n) => n.id === ref)) setSelection({ kind: 'node', id: ref })
-          else if (graph.transitions.some((t) => t.id === ref)) setSelection({ kind: 'transition', id: ref })
-        }} />
+        <Checks readiness={data.readiness} onPick={pick} />
+        <AnalysisPanel analysis={analysis} loading={analysis === null} error={analysisError}
+          stale={dirty} onPick={pick} />
         <Suggestions graph={graph} selection={selection} canReview={canReview} canEdit={canEdit} busy={busy}
           onSelect={setSelection} onReview={review}
           onAdd={(risk) => { update((g) => ({ ...g, risks: [...g.risks, risk] })); setSelection({ kind: 'risk', id: risk.id }) }}

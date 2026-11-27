@@ -3,7 +3,9 @@ import {
   newMapId, type Evidence, type Me, type NodeKind, type Outcome, type RiskCandidate,
   type ScenarioGraph, type ScenarioNode, type Severity, type TargetKind, type Transition,
 } from './api'
+import EstimateEditor from './EstimateEditor'
 import { KIND_LABEL, OUTCOME_LABEL, STATUS_LABEL, isModeled } from './graphUtil'
+import { pctExact, sumFractions } from './prob'
 import type { Selection } from './MapCanvas'
 
 type Update = (fn: (g: ScenarioGraph) => ScenarioGraph) => void
@@ -159,7 +161,12 @@ function LinkPanel(p: Props & { t: Transition }) {
   const { t, graph, update, canEdit } = p
   const groups = graph.decision_groups.filter((d) => d.node_id === t.source_node_id)
   const nodeLabel = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? 'Missing node'
-  const estimate = t.probability?.kind ?? 'unknown'
+  const group = graph.decision_groups.find((d) => d.id === t.decision_group_id)
+  const siblings = group ? graph.transitions.filter((x) => x.decision_group_id === group.id && isModeled(x.review_status)) : []
+  const unknownSiblings = siblings.filter((x) => !x.probability || x.probability.kind === 'unknown').length
+  const rangeSiblings = siblings.filter((x) => x.probability?.kind === 'range').length
+  const points = siblings.filter((x) => x.probability?.kind === 'point').map((x) => String(x.probability?.value))
+  const pointTotal = points.length ? sumFractions(points) : null
 
   const addGroup = () => {
     const id = newMapId('dgp')
@@ -215,7 +222,26 @@ function LinkPanel(p: Props & { t: Transition }) {
           <button type="button" onClick={addGroup}>Group all links leaving this step</button>
         )}
       </fieldset>
-      <p className="small muted">Probability: {estimate === 'unknown' ? 'unknown (no estimate yet)' : estimate}</p>
+      <Section title="Probability">
+        <p className="muted small">Chance of this outcome once the run reaches “{nodeLabel(t.source_node_id)}”.</p>
+        <EstimateEditor key={`${t.id}:${JSON.stringify(t.probability ?? null)}`} estimate={t.probability}
+          disabled={!canEdit} onApply={(probability) => patchLink(update, t.id, { probability })} />
+        {group && (
+          <div className="group-box">
+            <p className="small"><strong>{group.label}</strong>: {siblings.length} branch(es){
+              unknownSiblings > 0 ? `, ${unknownSiblings} without an estimate` : ''}{
+              pointTotal !== null ? `; exact estimates total ${pctExact(pointTotal)}` : ''}.</p>
+            <label className="check">
+              <input type="checkbox" checked={group.complete} disabled={!canEdit}
+                onChange={(e) => update((g) => ({ ...g, decision_groups: g.decision_groups.map((d) => d.id === group.id ? { ...d, complete: e.target.checked } : d) }))} />
+              Every possible outcome here is modeled (complete)
+            </label>
+            {group.complete && pointTotal !== null && unknownSiblings === 0 && rangeSiblings === 0 && pointTotal !== '1' && (
+              <p className="field-error small">A complete decision must total exactly 100%.</p>
+            )}
+          </div>
+        )}
+      </Section>
       <ReviewState status={t.review_status} origin={t.origin} canDecide={canEdit}
         onDecide={(s) => patchLink(update, t.id, { review_status: s })} />
       <Related {...p} kind="transition" id={t.id} />

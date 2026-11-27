@@ -35,12 +35,12 @@ async function checkoutProject(request: APIRequestContext): Promise<string> {
 const mapNode = (page: Page, text: string) => page.locator('.map-node', { hasText: text })
 const details = (page: Page) => page.getByRole('complementary', { name: 'Details' })
 
-async function generate(page: Page, id: string) {
+async function generate(page: Page, id: string, firstNode = 'Confirm requirements') {
   await page.goto(`/#/p/${id}`)
   await expect(page.getByRole('heading', { name: 'No scenario map yet' })).toBeVisible()
   await page.getByRole('button', { name: 'Generate map' }).first().click()
   await expect(page.getByText(/Map generated: \d+ added/)).toBeVisible()
-  await expect(mapNode(page, 'Confirm requirements')).toBeVisible()
+  await expect(mapNode(page, firstNode)).toBeVisible()
 }
 
 test('generate a map, review a suggestion, edit a step and save', async ({ page }) => {
@@ -101,4 +101,35 @@ test('a stale map save is refused and the newer map is kept', async ({ page, con
   await expect(page.getByText('Someone saved this project after you opened it.')).toBeVisible()
   await page.getByRole('button', { name: /Load the latest version/ }).click()
   await expect(mapNode(page, 'Confirm scope (other tab)')).toBeVisible()
+})
+
+test('estimates drive the probability panel: exact, then a range', async ({ page }) => {
+  const res = await page.request.post('/api/projects', { data: { start: 'Ready', goal: 'Done' } })
+  const id = (await res.json()).plan.project.id as string
+  created.push(id)
+  await generate(page, id, 'Ready')
+  const panel = page.getByRole('region', { name: 'Probability' })
+  await expect(panel).toContainText('Partial')
+
+  await mapNode(page, 'Ready').click()
+  await details(page).getByRole('button', { name: /Success to Done/ }).click()
+  await details(page).getByLabel('Probability', { exact: true }).selectOption('point')
+  await details(page).getByLabel('Percent (%)').fill('100')
+  await details(page).getByLabel('Assumption', { exact: true }).fill('Nothing can stop it')
+  await details(page).getByRole('button', { name: 'Apply estimate' }).click()
+  await page.getByRole('button', { name: 'Save map' }).click()
+  await expect(page.getByText('Map saved.')).toBeVisible()
+  await expect(panel).toContainText('Exact')
+  await expect(panel).toContainText('100.0%')
+
+  await details(page).getByLabel('Probability', { exact: true }).selectOption('range')
+  await details(page).getByLabel('Low (%)').fill('80')
+  await details(page).getByLabel('High (%)').fill('90')
+  await details(page).getByRole('button', { name: 'Apply estimate' }).click()
+  await page.getByRole('button', { name: 'Save map' }).click()
+  // A single 80–90% link leaves 10–20% of outcomes unmodeled: shown, never normalized away.
+  await expect(panel).toContainText('Clean first-pass success80% – 90%')
+  await expect(panel).toContainText('Eventual successat least 80% (partial)')
+  await expect(panel).toContainText('10%–20% of outcomes are not modeled')
+  await expect(page.locator('.react-flow__edge-text').first()).toContainText('80–90% hyp.')
 })

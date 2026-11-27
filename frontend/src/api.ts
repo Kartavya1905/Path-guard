@@ -303,3 +303,40 @@ export function newMapId(prefix: 'nod' | 'trn' | 'dgp' | 'rsk' | 'evd' | 'evl' |
   const bytes = crypto.getRandomValues(new Uint8Array(8))
   return `${prefix}_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`
 }
+
+// --------------------------------------------------------------------------- analysis
+
+export type ProbValue = {
+  status: 'exact' | 'bounds' | 'partial'; value?: string | null; low: string; high: string; note: string
+}
+export type GroupCheck = {
+  node_id: string; group_id: string | null; label: string
+  status: 'ok' | 'unresolved' | 'invalid'; complete: boolean
+  total_low: string; total_high: string; missing: string[]
+  unmodeled_low: string; unmodeled_high: string; message: string
+}
+export type PathResult = {
+  transitions: string[]; nodes: string[]; labels: string[]; probability: ProbValue
+  ends_in: string; uses_recovery: boolean
+}
+export type Analysis = {
+  status: 'exact' | 'bounds' | 'partial' | 'blocked'
+  blockers: string[]
+  first_pass: ProbValue | null
+  eventual_success: ProbValue | null
+  outcomes: Record<string, ProbValue>
+  groups: GroupCheck[]
+  missing_estimates: string[]
+  paths: PathResult[]
+  limits: {
+    max_depth: number; max_expansions: number; max_results: number; expansions_used: number
+    truncated: boolean; paths_found: number; paths_shown: number; paths_omitted: number
+    path_search_truncated: boolean
+  }
+  assumptions: string[]
+  issues: Issue[]
+}
+
+export const analysisApi = {
+  get: (id: string) => request<Analysis>('GET', `/projects/${encodeURIComponent(id)}/analysis`),
+}

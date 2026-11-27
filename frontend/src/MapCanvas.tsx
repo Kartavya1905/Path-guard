@@ -6,6 +6,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Outcome, ScenarioGraph, ScenarioNode } from './api'
 import { KIND_LABEL, OUTCOME_LABEL, STATUS_LABEL } from './graphUtil'
+import { estimateLabel } from './prob'
 
 export type Selection = { kind: 'node' | 'transition' | 'risk'; id: string } | null
 export type Highlight = { focus: Set<string>; causes: Set<string>; effects: Set<string>; edges: Set<string> }
@@ -134,7 +135,7 @@ export default function MapCanvas(p: Props) {
         id: t.id,
         source: t.source_node_id,
         target: t.target_node_id,
-        label: `${OUTCOME_LABEL[t.outcome]}${limit}${status}`,
+        label: `${OUTCOME_LABEL[t.outcome]} · ${estimateLabel(t.probability)}${limit}${status}`,
         ariaLabel: `${OUTCOME_LABEL[t.outcome]} link: ${t.trigger}`,
         selected,
         className: `edge-${t.outcome}${pending ? ' edge-pending' : ''}`,

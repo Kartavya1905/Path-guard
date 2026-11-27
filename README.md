@@ -2,7 +2,7 @@
 
 A visual project risk planner. You enter a starting situation and a goal, and PathGuard builds an editable scenario map of success, failure, delay and recovery paths. It ranks risks and compares a safeguard against a saved baseline. Everything runs locally. It uses no paid services, credentials or external AI.
 
-> Status: **Step 5 (three-panel workspace)**. Later steps are tracked in the plan below.
+> Status: **Step 6 (probability engine)**. Later steps are tracked in the plan below.
 
 ## Scenario engine
 
@@ -37,6 +37,36 @@ A visual project risk planner. You enter a starting situation and a goal, and Pa
 - **Deduplicated and stable:** each suggestion has a dedupe key and a deterministic ID.
 - **Regeneration keeps your work.** It refreshes rule items nobody has decided on, adds new ones and removes stale undecided ones. It never changes your own items, edited items or accept/reject decisions. Changing a rule item through `PUT …/graph` marks it `edited`.
 - **Review:** `POST /api/projects/{id}/risks/{risk_id}/review` with `decision` (`accept` or `reject`), `model_branch` and `revision`. Accepting with `model_branch: true` adds the suggested branch to the modeled map. Owners, editors and reviewers can review.
+
+### Probability engine
+
+`analysis.py` analyzes the saved, modeled map. It's local arithmetic only, with no AI and no network. `GET /api/projects/{id}/analysis` returns the results. Optional `max_depth` (default 200), `max_expansions` (default 20000) and `max_results` (default 10) cap the work, and every cap is reported.
+
+- **Estimates:** each link has an exact percentage, a range or **unknown**, plus its source:
+  - measured: data source, count and sample size, date range, context
+  - expert: reviewer, rationale, assumptions, review date
+  - hypothetical: labeled assumption
+
+  Whether a person has reviewed it is recorded separately. Values are stored as exact decimal fractions, and the UI converts percentages without floating point.
+- **Decisions:** every decision point is checked.
+  - A **complete** decision must total exactly 100%, or with ranges, be able to reach 100%.
+  - Totals over 100% are always invalid.
+  - An incomplete decision, or a single link below 100%, keeps its **unmodeled** share visible. Nothing is normalized, and no zero, average or remainder is filled in.
+- **Results:**
+  - **Clean first-pass success:** the goal is reached through success links only.
+  - **Eventual success:** the goal is reached after any modeled recovery.
+  - **Outcomes:** every run ends in exactly one of goal, failure, other modeled outcome, retries exhausted, not modeled, or cut off by limits.
+- **How runs are counted:** runs are followed state by state, where the state includes how often each attempt-limited link has been used. This keeps retries bounded and stops paths that merge again from being counted twice. A run that would go past a link's attempt limit ends as "retries exhausted".
+- **Exact, bounds, partial:**
+  - Exact needs point estimates wherever they matter.
+  - Ranges give outer bounds, never midpoints.
+  - A missing estimate, unmodeled outcomes or a limit being hit make the result **partial**. Then only the guaranteed minimum is shown, and no exact eventual figure is given.
+- **Most likely paths** are listed as examples. The totals never come from adding them up.
+- **Checkout examples** (`examples.py`, all numbers hypothetical):
+  - Launch: clean first-pass 72.675% baseline and 81.225% with the checklist variant (+8.55 pp). Eventual success is 89.7065316% with rework and rollback.
+  - Transaction: the primary path is 81.144%.
+
+In the workspace, set an estimate in the right panel when a link is selected. Mark a decision complete there too, and see its total. Map links show their percentage, with "hyp." for hypothetical estimates. The **Probability** section in the left panel shows the results for the last saved map.
 
 ### Validation
 

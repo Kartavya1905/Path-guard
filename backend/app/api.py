@@ -8,7 +8,7 @@ nothing is written.
 
 from datetime import UTC, date, datetime
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
@@ -41,6 +41,7 @@ from app.schemas import (
     VersionSummary,
 )
 from pathguard_engine import (
+    Analysis,
     Plan,
     Prerequisite,
     Project,
@@ -48,6 +49,7 @@ from pathguard_engine import (
     ScenarioGraph,
     ScenarioVersion,
     Task,
+    analyze,
     generate,
     mark_edits,
     new_id,
@@ -301,6 +303,17 @@ def review_suggestion(project_id: str, risk_id: str, body: ReviewIn, session: Se
     out = _graph_out(session, row, new)
     session.commit()
     return out
+
+
+@router.get("/projects/{project_id}/analysis", response_model=Analysis)
+def analyze_graph(project_id: str, session: SessionDep, user: UserDep,
+                  max_depth: int = Query(200, ge=1, le=1000),
+                  max_expansions: int = Query(20000, ge=1, le=200000),
+                  max_results: int = Query(10, ge=1, le=100)) -> Analysis:
+    """Probability analysis of the saved map. Local calculation only; nothing is stored."""
+    row, _ = project_access(session, user, project_id, "read")
+    return analyze(ScenarioGraph.model_validate(row.graph), _load_plan(session, row),
+                   max_depth=max_depth, max_expansions=max_expansions, max_results=max_results)
 
 
 # --------------------------------------------------------------------------- versions

@@ -192,3 +192,29 @@ def test_review_notes_are_stamped_and_append_only(api):
         headers=PLANNER,
     )
     assert [n["id"] for n in res.json()["graph"]["notes"]] == ["not_note00001"]
+
+
+def test_analysis_of_the_checkout_example(api):
+    from pathguard_engine.examples import checkout_launch
+
+    pid = create(api)["plan"]["project"]["id"]
+    graph = checkout_launch()[1].model_dump(mode="json")
+    for n in graph["nodes"]:
+        n["task_id"] = None  # the example's tasks belong to the example project
+    res = api.put(
+        f"/api/projects/{pid}/graph", json={"graph": graph, "revision": 1}, headers=PLANNER
+    )
+    assert res.status_code == 200, res.text
+    out = api.get(f"/api/projects/{pid}/analysis?max_results=3", headers=PLANNER).json()
+    assert out["status"] == "exact"
+    assert out["first_pass"]["value"] == "0.72675"
+    assert len(out["paths"]) == 3 and out["limits"]["max_results"] == 3
+    assert api.get(f"/api/projects/{pid}/analysis", headers=OUTSIDER).status_code == 404
+    assert api.get(f"/api/projects/{pid}/analysis?max_depth=0", headers=PLANNER).status_code == 422
+
+
+def test_analysis_of_a_fresh_map_is_partial(api):
+    pid = create(api)["plan"]["project"]["id"]
+    generate(api, pid, 1)
+    out = api.get(f"/api/projects/{pid}/analysis", headers=PLANNER).json()
+    assert out["status"] == "partial" and out["missing_estimates"]
