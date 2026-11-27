@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     secret_key: str = ""  # signs visitor cookies; required when visitor identity is on
     visitor_retention_days: int = 7  # visitor projects untouched this long are deleted
     visitor_project_limit: int = 20
+    visitor_seed_examples: bool = True  # give each new visitor the two checkout examples
     # Built web app to serve from the API process (single-container hosting).
     static_dir: str | None = None
     # No project data leaves the machine unless this is switched on explicitly.

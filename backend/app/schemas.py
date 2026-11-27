@@ -6,13 +6,17 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, NonNegativeInt
 
 from pathguard_engine import (
+    DecisionGroup,
     Issue,
+    Mitigation,
     Plan,
     Prerequisite,
     ProjectContext,
     Readiness,
     ScenarioGraph,
+    ScenarioNode,
     Task,
+    Transition,
 )
 from pathguard_engine.ids import EntityId
 from pathguard_engine.model import LongText, Text
@@ -88,6 +92,16 @@ class VersionCreate(In):
     kind: Literal["baseline", "variant", "snapshot"] = "snapshot"
     parent_version_id: EntityId | None = None
     revision: NonNegativeInt  # must match: you snapshot exactly what you saw
+
+
+class VariantCreate(In):
+    """A variant = its baseline plus one mitigation, applied on the server."""
+
+    label: Text
+    mitigation: Mitigation
+    add_nodes: list[ScenarioNode] = []  # e.g. a safeguard or recovery step
+    add_transitions: list[Transition] = []
+    add_groups: list[DecisionGroup] = []
 
 
 class VersionSummary(BaseModel):

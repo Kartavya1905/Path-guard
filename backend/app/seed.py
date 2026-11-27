@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_sessionmaker
+from app.examples_seed import seed_examples
 from app.models import User
 
 DEMO_USERS = [
@@ -29,7 +30,9 @@ def main() -> None:
         return
     with get_sessionmaker()() as session:
         seed_demo_users(session)
-    print(f"Seeded {len(DEMO_USERS)} demo users.")
+        added = seed_examples(session, DEMO_USERS[0][0])
+    print(f"Seeded {len(DEMO_USERS)} demo users; examples added: "
+          f"{added or 'none (already there)'}.")
 
 
 if __name__ == "__main__":

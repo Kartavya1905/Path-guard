@@ -88,6 +88,10 @@ def _visitor(request: Request, response: Response, session: Session,
                     is_demo=True)
         session.add(user)
         session.commit()  # read-only routes never commit, so persist the visitor now
+        if settings.visitor_seed_examples:
+            from app.examples_seed import seed_examples  # local import: avoids a cycle
+
+            seed_examples(session, user.id)
     response.set_cookie(
         VISITOR_COOKIE, visitor_cookie(user.id, settings.secret_key),
         max_age=settings.visitor_retention_days * 86400, httponly=True, samesite="lax",

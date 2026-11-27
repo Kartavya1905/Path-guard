@@ -234,3 +234,59 @@ def test_worst_case_explorer_keeps_critical_risks_first(api):
     ex = api.get(f"/api/projects/{pid}/explorer", headers=PLANNER).json()
     assert ex["excluded_rejected"] == 1 and risk not in [r["id"] for r in ex["risks"]]
     assert api.get(f"/api/projects/{pid}/explorer", headers=OUTSIDER).status_code == 404
+
+
+def _seeded_launch(api):
+    from app.db import get_sessionmaker
+    from app.examples_seed import seed_examples
+
+    with get_sessionmaker()() as session:
+        seed_examples(session, "usr_demo0001")
+    projects = api.get("/api/projects", headers=PLANNER).json()
+    return next(p["id"] for p in projects if p["title"] == "Checkout launch (example)")
+
+
+def test_seeded_launch_compares_baseline_and_checklist(api):
+    pid = _seeded_launch(api)
+    versions = api.get(f"/api/projects/{pid}/versions", headers=PLANNER).json()
+    base, variant = versions[0]["id"], versions[1]["id"]
+    res = api.get(f"/api/projects/{pid}/compare?baseline={base}&variant={variant}", headers=PLANNER)
+    assert res.status_code == 200, res.text
+    c = res.json()
+    assert c["baseline"]["first_pass"]["value"] == "0.72675"
+    assert c["variant"]["first_pass"]["value"] == "0.81225"
+    assert c["first_pass_delta"]["comparable"] and c["first_pass_delta"]["pp"] == "8.55"
+    assert len(c["changed_branches"]) == 2
+
+
+def test_create_variant_from_a_baseline(api):
+    from pathguard_engine.examples import checklist_mitigation
+
+    pid = _seeded_launch(api)
+    base = api.get(f"/api/projects/{pid}/versions", headers=PLANNER).json()[0]
+    before = api.get(f"/api/projects/{pid}/versions/{base['id']}", headers=PLANNER).json()
+    m = checklist_mitigation().model_copy(update={"id": "mit_again000001"})
+    body = {"label": "Checklist again", "mitigation": m.model_dump(mode="json")}
+    res = api.post(
+        f"/api/projects/{pid}/versions/{base['id']}/variants", json=body, headers=PLANNER
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["parent_version_id"] == base["id"] and res.json()["kind"] == "variant"
+    after = api.get(f"/api/projects/{pid}/versions/{base['id']}", headers=PLANNER).json()
+    assert after == before  # the baseline is unchanged
+
+    one_sided = m.model_copy(
+        update={"id": "mit_onesided01", "estimate_changes": m.estimate_changes[:1]}
+    )
+    body = {"label": "Broken", "mitigation": one_sided.model_dump(mode="json")}
+    res = api.post(
+        f"/api/projects/{pid}/versions/{base['id']}/variants", json=body, headers=PLANNER
+    )
+    assert res.status_code == 422
+    assert "Change these estimates explicitly" in res.json()["detail"]["message"]
+    assert (
+        api.post(
+            f"/api/projects/{pid}/versions/{base['id']}/variants", json=body, headers=OUTSIDER
+        ).status_code
+        == 404
+    )

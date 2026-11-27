@@ -2,7 +2,7 @@
 
 A visual project risk planner. You enter a starting situation and a goal, and PathGuard builds an editable scenario map of success, failure, delay and recovery paths. It ranks risks and compares a safeguard against a saved baseline. Everything runs locally. It uses no paid services, credentials or external AI.
 
-> Status: **Step 7 (worst-case explorer)**. Later steps are tracked in the plan below.
+> Status: **Step 8 (baseline vs mitigation comparison, seeded examples)**. Later steps are tracked in the plan below.
 
 ## Scenario engine
 
@@ -86,6 +86,46 @@ In the workspace, set an estimate in the right panel when a link is selected. Ma
   - The likelihood and evidence filters never hide a critical-impact risk. The status line counts the critical risks kept visible this way.
   - The status line says how many risks are shown, hidden by filters and rejected.
   - On the map, the toolbar counts collapsed nodes and hidden rejected nodes.
+
+### Baseline vs mitigation
+
+`compare.py` applies mitigations and compares versions. In the workspace, open the **Versions** view:
+
+1. **Save current map as baseline.** This creates an immutable, hashed version.
+2. **Create a variant with a mitigation:**
+   - A mitigation records its title, target, rationale, owner, expected effect, cost, delay and assumptions.
+   - It can change explicit estimates, add a safeguard or recovery branch (API: `add_nodes` / `add_transitions`), or change who owns a task.
+   - The server applies it to a copy of the version you start from, so the baseline never changes.
+   - If a change leaves a complete decision off 100%, the variant is refused, and the message names the sibling estimates you need to change explicitly. Nothing is rebalanced for you.
+3. **Compare:** the two versions side by side.
+   - Clean first-pass and eventual success.
+   - Severe (critical or high) risks.
+   - Mitigation and task cost and delay.
+   - Open assumptions, hypothetical estimates and links without estimates.
+   - Every changed, added or removed branch, with its before and after estimates.
+   - Differences in **percentage points**, given only when both sides are exact.
+   - Flags for different coverage and unresolved inputs, so an invalid comparison isn't presented as a number.
+
+API: `POST /api/projects/{id}/versions/{version_id}/variants` and `GET /api/projects/{id}/compare?baseline=…&variant=…`.
+
+### Seeded examples
+
+Two checkout examples are seeded, with every number labeled hypothetical:
+
+- Locally, `python -m app.seed`, which the API container runs on start, adds them to Demo Planner's account.
+- Online, each new visitor gets their own copy (`PATHGUARD_VISITOR_SEED_EXAMPLES`, default on).
+- Seeding is idempotent per user, by title.
+
+- **Checkout launch (example):**
+  - Plan: Checkout change approved → Confirm requirements → Build integration → QA and staged rollout → Reliable launch with verified checkout behavior.
+  - Gates of 85%, 90% and 95%, with rework, integration-fix and rollback branches.
+  - Risks: one accepted critical risk, two suggested high risks, and a suggested provider-delay branch whose estimate is still **unknown**.
+  - Versions: v1 Baseline and v2 Requirements checklist. Scope ambiguity drops from 15% to 5%.
+  - Results: clean first-pass **72.675% → 81.225% (+8.55 pp)**, and eventual success 89.7065316% → 93.0987954% (+3.3922638 pp).
+- **Checkout transaction (example):**
+  - Valid cart 92%, authorized payment 90%, confirmed order 98%, so the primary path is **81.144%**.
+  - The alternate cart, payment and confirmation outcomes are modeled.
+  - Versions: v1 Baseline.
 
 ### Validation
 

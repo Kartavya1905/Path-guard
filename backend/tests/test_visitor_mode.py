@@ -20,6 +20,7 @@ def visitor_app(api, monkeypatch):
     monkeypatch.setenv("PATHGUARD_DEMO_IDENTITY_ENABLED", "false")
     monkeypatch.setenv("PATHGUARD_VISITOR_IDENTITY_ENABLED", "true")
     monkeypatch.setenv("PATHGUARD_SECRET_KEY", SECRET)
+    monkeypatch.setenv("PATHGUARD_VISITOR_SEED_EXAMPLES", "false")  # one test turns it on
     reset_caches()
     from app.main import create_app
 
@@ -88,8 +89,10 @@ def test_project_limit_per_browser(browser, monkeypatch):
 def test_untouched_projects_expire(browser, pg_engine):
     pid = browser.post("/api/projects", json=MIN).json()["plan"]["project"]["id"]
     with pg_engine.begin() as conn:
-        conn.execute(text("UPDATE projects SET updated_at = now() - interval '8 days' "
-                          "WHERE id = :id"), {"id": pid})
+        conn.execute(
+            text("UPDATE projects SET updated_at = now() - interval '8 days' WHERE id = :id"),
+            {"id": pid},
+        )
     from app.purge import main as purge
 
     purge()
@@ -103,8 +106,9 @@ def test_health_reports_visitor_mode(browser):
 
 
 def test_oversized_body_is_rejected(browser):
-    res = browser.post("/api/projects", content=b"x" * 2_000_001,
-                       headers={"Content-Type": "application/json"})
+    res = browser.post(
+        "/api/projects", content=b"x" * 2_000_001, headers={"Content-Type": "application/json"}
+    )
     assert res.status_code == 413
 
 
@@ -128,3 +132,16 @@ def test_settings_guards():
         Settings(demo_identity_enabled=True, visitor_identity_enabled=True, secret_key=SECRET)
     s = Settings(database_url="postgres://u:p@host/db?sslmode=require")
     assert s.database_url == "postgresql+psycopg://u:p@host/db?sslmode=require"
+
+
+def test_new_visitors_get_the_checkout_examples(visitor_app, monkeypatch):
+    monkeypatch.setenv("PATHGUARD_VISITOR_SEED_EXAMPLES", "true")
+    reset_caches()
+    browser = visitor_app()
+    titles = sorted(p["title"] for p in browser.get("/api/projects").json())
+    assert titles == ["Checkout launch (example)", "Checkout transaction (example)"]
+    launch = next(p for p in browser.get("/api/projects").json() if "launch" in p["title"])
+    versions = browser.get(f"/api/projects/{launch['id']}/versions").json()
+    assert [v["kind"] for v in versions] == ["baseline", "variant"]
+    # a second visit does not seed again
+    assert len(browser.get("/api/projects").json()) == 2

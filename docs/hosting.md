@@ -12,6 +12,7 @@ Neither should ask for a card on the free plans. If either one asks for payment 
 - **Visitor identity:** each browser gets its own anonymous account in a signed, HttpOnly cookie (`PATHGUARD_VISITOR_IDENTITY_ENABLED=true`). Visitors only see projects they created. This isn't a login: clearing cookies or switching browsers starts a fresh, empty account.
 - **Expiry:** projects untouched for 7 days are deleted (`PATHGUARD_VISITOR_RETENTION_DAYS`). Visitor accounts with nothing in them are deleted after a day. Cleanup runs on every start and whenever a project is created.
 - **Limits:** 20 projects per browser, and request bodies up to 2 MB.
+- **Starter examples:** each new visitor gets the two checkout examples, the launch with its baseline and checklist variant, and the transaction. Set `PATHGUARD_VISITOR_SEED_EXAMPLES=false` to turn this off.
 - **Banner:** every page says it's a public demo and not for real or sensitive data.
 - **No external processing:** external processing stays off, so no project data is sent anywhere else.
 - **Free-plan limits:** Render's free service sleeps after about 15 minutes without traffic, so the first visit after that takes 30–60 seconds. Neon's free database also pauses when idle and wakes automatically.

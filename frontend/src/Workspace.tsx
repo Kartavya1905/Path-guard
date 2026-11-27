@@ -10,6 +10,7 @@ import {
 import AnalysisPanel from './AnalysisPanel'
 import Inspector from './Inspector'
 import MapCanvas, { type Highlight, type Selection } from './MapCanvas'
+import VersionsPanel from './VersionsPanel'
 import WorstCases from './WorstCases'
 
 type Props = { projectId: string }
@@ -49,7 +50,7 @@ export default function Workspace({ projectId }: Props) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [explorer, setExplorer] = useState<Explorer | null>(null)
   const [explorerError, setExplorerError] = useState<string | null>(null)
-  const [centerView, setCenterView] = useState<'map' | 'worst'>('map')
+  const [centerView, setCenterView] = useState<'map' | 'worst' | 'versions'>('map')
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const savedRevision = data?.revision
   useEffect(() => {
@@ -243,6 +244,7 @@ export default function Workspace({ projectId }: Props) {
           <div className="segmented" role="group" aria-label="View">
             <button type="button" aria-pressed={centerView === 'map'} onClick={() => setCenterView('map')}>Map</button>
             <button type="button" aria-pressed={centerView === 'worst'} onClick={() => setCenterView('worst')}>Worst cases</button>
+            <button type="button" aria-pressed={centerView === 'versions'} onClick={() => setCenterView('versions')}>Versions</button>
           </div>
           {canEdit && (
             <button type="button" className={empty ? 'primary' : ''} disabled={busy} onClick={generate}>
@@ -278,7 +280,10 @@ export default function Workspace({ projectId }: Props) {
         {!canEdit && <p className="alert info banner">Your role ({role}) can view this map{canReview ? ' and review suggestions' : ''} but not edit it.</p>}
         {centerView === 'map' && <Legend />}
         <div className={centerView === 'map' ? 'canvas' : 'canvas scroll'}>
-          {centerView === 'worst' ? (
+          {centerView === 'versions' ? (
+            <VersionsPanel projectId={projectId} revision={data.revision} dirty={dirty}
+              canPublish={canEdit} onSaved={() => undefined} />
+          ) : centerView === 'worst' ? (
             <WorstCases explorer={explorer} error={explorerError} stale={dirty}
               onShow={(id) => { setSelection({ kind: 'risk', id }); setCenterView('map') }} />
           ) : empty ? (

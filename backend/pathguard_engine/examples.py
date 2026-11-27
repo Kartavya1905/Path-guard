@@ -11,14 +11,19 @@ the demo seed (later step).
    order 98% -> primary path 81.144%, with the alternate outcomes modeled.
 """
 
+from decimal import Decimal
+
 from pathguard_engine.ids import stable_id
 from pathguard_engine.model import (
     DecisionGroup,
+    EstimateChange,
     Layout,
+    Mitigation,
     Plan,
     Prerequisite,
     Project,
     ProjectContext,
+    RiskCandidate,
     ScenarioGraph,
     ScenarioNode,
     Task,
@@ -64,9 +69,9 @@ class _Builder:
             id=stable_id("transition", self.key, a, b), source_node_id=a, target_node_id=b,
             outcome="success", trigger=trigger, probability=_hyp(percent, assumption)))
 
-    def graph(self) -> ScenarioGraph:
+    def graph(self, risks: list[RiskCandidate] | None = None) -> ScenarioGraph:
         return ScenarioGraph(nodes=self.nodes, transitions=self.transitions,
-                             decision_groups=self.groups)
+                             decision_groups=self.groups, risks=risks or [])
 
 
 def checkout_launch(variant: bool = False) -> tuple[Plan, ScenarioGraph]:
@@ -125,7 +130,66 @@ def checkout_launch(variant: bool = False) -> tuple[Plan, ScenarioGraph]:
         (qa, "recovery", "Roll back, fix and redeploy", "60", "Rollback usually works", 1),
         (blocked, "failure", "Rollback fails", "40", "Data changes can block rollback"),
     ])
-    return plan, b.graph()
+
+    # A suggested delay branch with no estimate yet: visible on the map ("?"), not modeled.
+    waiting = b.node("waiting", "delay", "Waiting for payment provider approval", 700, -180)
+    b.nodes[-1] = b.nodes[-1].model_copy(update={"origin": "rule", "review_status": "suggested"})
+    for src, dst, outcome, trigger in ((build, waiting, "delay", "Provider review is slow"),
+                                       (waiting, qa, "success", "Provider approves")):
+        b.transitions.append(Transition(
+            id=stable_id("transition", key, src, dst), source_node_id=src, target_node_id=dst,
+            outcome=outcome, trigger=trigger, origin="rule", review_status="suggested"))
+
+    def risk(name, category, title, trigger, impact, affected, status, why, then, fix):
+        return RiskCandidate(
+            id=stable_id("risk", key, name), category=category, title=title, trigger=trigger,
+            affected_task_id=None, affected_node_ids=affected, rationale=why, consequence=then,
+            mitigation_hint=fix, impact=impact, origin="rule", review_status=status,
+            rule_id=f"checkout.{name}", dedupe_key=f"example:{name}")
+
+    risks = [
+        risk("release", "release_defect", "Release defect or failed rollback",
+             "A defect appears in production during rollout", "critical", [qa, rollback],
+             "accepted", "Checkout releases affect revenue immediately.",
+             "Customers can't complete checkout until a rollback succeeds.",
+             "Release behind a feature flag with a tested rollback."),
+        risk("scope", "unclear_requirements", "Unclear requirements",
+             "Scope or acceptance criteria are ambiguous", "high", [scope, rework], "suggested",
+             "Gaps in pricing, tax and payment rules surface late.",
+             "Rework after build starts, which delays the launch.",
+             "Agree acceptance criteria with a requirements checklist before building."),
+        risk("api", "api_mismatch", "Payment API mismatch",
+             "The integration does not match the provider's API contract", "high",
+             [build, defect], "suggested", "Sandbox and production APIs behave differently.",
+             "Payments fail in testing or after release.",
+             "Contract-test against the provider sandbox."),
+        risk("provider", "approval_bottleneck", "Payment provider approval delay",
+             "The provider's review of the integration is slow", "medium", [build, waiting],
+             "suggested", "Provider reviews queue behind other merchants.",
+             "QA starts late.", "Book the provider review early."),
+    ]
+    return plan, b.graph(risks)
+
+
+def checklist_mitigation() -> Mitigation:
+    """The checklist variant: scope ambiguity 15% -> 5%, so scope clarity 85% -> 95%."""
+    key = "example:checkout-launch"
+    scope, build = stable_id("node", key, "scope"), stable_id("node", key, "build")
+    rework = stable_id("node", key, "rework")
+    note = "With the requirements checklist, scope ambiguity drops to 5%"
+    return Mitigation(
+        id=stable_id("mitigation", key, "checklist"), title="Requirements checklist",
+        target_kind="transition", target_id=stable_id("transition", key, scope, rework),
+        rationale="A shared checklist catches ambiguous pricing, tax and payment rules early.",
+        owner="Product owner", expected_effect="Scope ambiguity drops from 15% to 5%.",
+        cost=Decimal("1200"), delay_days=Decimal("1"),
+        assumptions=["The checklist is used for every checkout change (hypothetical)."],
+        estimate_changes=[
+            EstimateChange(transition_id=stable_id("transition", key, scope, build),
+                           new_probability=_hyp("95", note)),
+            EstimateChange(transition_id=stable_id("transition", key, scope, rework),
+                           new_probability=_hyp("5", note)),
+        ])
 
 
 def checkout_transaction() -> tuple[Plan, ScenarioGraph]:

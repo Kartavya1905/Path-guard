@@ -37,11 +37,14 @@ from app.schemas import (
     MemberIn,
     ProjectSummary,
     ReviewIn,
+    VariantCreate,
     VersionCreate,
     VersionSummary,
 )
+from app.versions import insert_version
 from pathguard_engine import (
     Analysis,
+    Comparison,
     Explorer,
     Plan,
     Prerequisite,
@@ -51,6 +54,8 @@ from pathguard_engine import (
     ScenarioVersion,
     Task,
     analyze,
+    apply_mitigation,
+    compare,
     explore,
     generate,
     mark_edits,
@@ -350,24 +355,53 @@ def save_version(project_id: str, body: VersionCreate, session: SessionDep,
     elif body.kind == "variant":
         raise HTTPException(422, "A variant needs parent_version_id (its baseline).")
 
-    number = (session.scalar(select(func.max(VersionRow.number))
-                             .where(VersionRow.project_id == row.id)) or 0) + 1
-    version = ScenarioVersion(
-        id=new_id("version"), project_id=row.id, number=number, label=body.label,
-        kind=body.kind, parent_version_id=body.parent_version_id, created_by=user.id,
-        created_at=datetime.now(UTC), plan=_load_plan(session, row),
-        graph=ScenarioGraph.model_validate(row.graph))
-    snapshot = version.model_dump(mode="json", include={"plan", "graph"})
-    session.add(VersionRow(
-        id=version.id, project_id=row.id, number=number, label=version.label,
-        kind=version.kind, parent_version_id=version.parent_version_id, created_by=user.id,
-        created_at=version.created_at, snapshot=snapshot, content_hash=version.content_hash))
-    audit.record(session, project_id=row.id, actor_id=user.id, action="version.published",
-                 target_kind="version", target_id=version.id,
-                 detail={"number": number, "kind": version.kind,
-                         "content_hash": version.content_hash})
+    version = insert_version(session, project_id=row.id, user_id=user.id, label=body.label,
+                             kind=body.kind, parent_version_id=body.parent_version_id,
+                             plan=_load_plan(session, row),
+                             graph=ScenarioGraph.model_validate(row.graph))
     session.commit()
     return version
+
+
+def _version_row(session: Session, project_id: str, version_id: str) -> VersionRow:
+    v = session.get(VersionRow, version_id)
+    if v is None or v.project_id != project_id:
+        raise HTTPException(404, "Version not found.")
+    return v
+
+
+@router.post("/projects/{project_id}/versions/{version_id}/variants",
+             response_model=ScenarioVersion, status_code=201)
+def create_variant(project_id: str, version_id: str, body: VariantCreate, session: SessionDep,
+                   user: UserDep) -> ScenarioVersion:
+    """Apply one mitigation to a saved version; the result is a new, separate variant.
+
+    The parent version and the working draft are not changed.
+    """
+    row, _ = project_access(session, user, project_id, "publish")
+    parent = _version_out(_version_row(session, row.id, version_id))
+    plan, graph, issues = apply_mitigation(
+        parent.plan, parent.graph, body.mitigation, add_nodes=body.add_nodes,
+        add_transitions=body.add_transitions, add_groups=body.add_groups)
+    if issues:
+        raise HTTPException(422, {"code": "variant_invalid",
+                                  "message": "; ".join(i.message for i in issues),
+                                  "issues": [i.model_dump() for i in issues]})
+    version = insert_version(session, project_id=row.id, user_id=user.id, label=body.label,
+                             kind="variant", parent_version_id=parent.id, plan=plan,
+                             graph=graph, detail={"mitigation": body.mitigation.id})
+    session.commit()
+    return version
+
+
+@router.get("/projects/{project_id}/compare", response_model=Comparison)
+def compare_versions(project_id: str, baseline: str, variant: str, session: SessionDep,
+                     user: UserDep) -> Comparison:
+    """Side-by-side comparison of two saved versions (local calculation only)."""
+    row, _ = project_access(session, user, project_id, "read")
+    b = _version_out(_version_row(session, row.id, baseline))
+    v = _version_out(_version_row(session, row.id, variant))
+    return compare((b.plan, b.graph), (v.plan, v.graph))
 
 
 @router.get("/projects/{project_id}/versions/{version_id}", response_model=ScenarioVersion)

@@ -158,3 +158,47 @@ test('worst cases: critical stays visible, cascades are traced, show on map', as
   await expect(details(page)).toContainText('Release defect or failed rollback')
   await expect(page.locator('.map-node.role-effect').first()).toBeVisible()
 })
+
+test('save a baseline, apply the checklist as a variant, and see +8.55 pp', async ({ page }) => {
+  // Copy the seeded launch example's baseline map into a fresh project.
+  const projects = await (await page.request.get('/api/projects')).json() as { id: string; title: string }[]
+  const seeded = projects.find((p) => p.title === 'Checkout launch (example)')
+  expect(seeded, 'the checkout launch example should be seeded').toBeTruthy()
+  const versions = await (await page.request.get(`/api/projects/${seeded!.id}/versions`)).json()
+  const base = await (await page.request.get(`/api/projects/${seeded!.id}/versions/${versions[0].id}`)).json()
+  const res = await page.request.post('/api/projects', { data: { start: base.plan.project.start, goal: base.plan.project.goal, title: 'Checklist demo' } })
+  const created_ = await res.json()
+  const id = created_.plan.project.id as string
+  created.push(id)
+  for (const n of base.graph.nodes) n.task_id = null
+  expect((await page.request.put(`/api/projects/${id}/graph`, { data: { graph: base.graph, revision: 1 } })).status()).toBe(200)
+
+  await page.goto(`/#/p/${id}`)
+  await page.getByRole('button', { name: 'Versions', exact: true }).click()
+  await page.getByRole('button', { name: 'Save current map as baseline' }).click()
+  await expect(page.getByText(/Saved version 1/)).toBeVisible()
+
+  await page.getByLabel('Variant name').fill('Requirements checklist')
+  await page.getByLabel('Mitigation', { exact: true }).fill('Requirements checklist')
+  await page.getByLabel('Expected effect').fill('Scope ambiguity drops from 15% to 5%')
+  await page.getByLabel('Link 1').selectOption({ label: 'Confirm requirements → Build integration (Scope is clear)' })
+  await page.getByLabel('New percent 1').fill('95')
+  await page.getByLabel('Assumption 1').fill('Checklist used on every change')
+  await page.getByRole('button', { name: '+ Another change' }).click()
+  await page.getByLabel('Link 2').selectOption({ label: 'Confirm requirements → Scope ambiguity found (Scope is ambiguous)' })
+  await page.getByLabel('New percent 2').fill('5')
+  await page.getByLabel('Assumption 2').fill('Checklist used on every change')
+  await page.getByRole('button', { name: 'Create variant' }).click()
+  await expect(page.getByText(/Created variant v2/)).toBeVisible()
+
+  const cmp = page.locator('.comparison')
+  await expect(cmp.locator('.delta-card').first()).toContainText('+8.55 pp')
+  await expect(cmp).toContainText('72.7% (exact 72.675%)')
+  await expect(cmp).toContainText('81.2% (exact 81.225%)')
+  await expect(cmp).toContainText('85% (hypothetical)')
+
+  await page.reload()
+  await page.getByRole('button', { name: 'Versions', exact: true }).click()
+  await expect(page.locator('.version-list li')).toHaveCount(2)
+  await expect(page.locator('.comparison .delta-card').first()).toContainText('+8.55 pp')
+})

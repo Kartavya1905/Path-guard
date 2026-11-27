@@ -366,3 +366,42 @@ export type Explorer = {
 export const explorerApi = {
   get: (id: string) => request<Explorer>('GET', `/projects/${encodeURIComponent(id)}/explorer`),
 }
+
+// --------------------------------------------------------------------------- versions
+
+export type VersionSummary = {
+  id: string; number: number; label: string; kind: 'baseline' | 'variant' | 'snapshot'
+  parent_version_id: string | null; created_by: string; created_at: string; content_hash: string
+}
+export type ScenarioVersion = VersionSummary & {
+  project_id: string; plan: DraftOut['plan']; graph: ScenarioGraph
+}
+export type Side = {
+  status: Analysis['status']; first_pass: ProbValue | null; eventual_success: ProbValue | null
+  severe_risks: string[]; open_assumptions: string[]; hypothetical_estimates: number
+  missing_estimates: number; mitigation_cost: string | null; mitigation_delay_days: string | null
+  task_cost: string | null; task_days: string | null; mitigations: string[]
+}
+export type Delta = { comparable: boolean; pp: string | null; low_pp: string | null; high_pp: string | null; note: string }
+export type Comparison = {
+  baseline: Side; variant: Side; first_pass_delta: Delta; eventual_delta: Delta
+  changed_branches: { transition_id: string; label: string; change: 'added' | 'removed' | 'changed'; before: string | null; after: string | null; fields: string[] }[]
+  added_nodes: string[]; removed_nodes: string[]; flags: string[]
+}
+export type MitigationIn = {
+  id: string; title: string; target_kind: TargetKind; target_id: string; rationale: string
+  owner: string | null; expected_effect: string; cost: string | null; delay_days: string | null
+  assumptions: string[]; estimate_changes: { transition_id: string; new_probability: Estimate }[]
+}
+
+const vp = (id: string) => `/projects/${encodeURIComponent(id)}`
+export const versionsApi = {
+  list: (id: string) => request<VersionSummary[]>('GET', `${vp(id)}/versions`),
+  get: (id: string, vid: string) => request<ScenarioVersion>('GET', `${vp(id)}/versions/${encodeURIComponent(vid)}`),
+  saveBaseline: (id: string, label: string, revision: number) =>
+    request<ScenarioVersion>('POST', `${vp(id)}/versions`, { label, kind: 'baseline', revision }),
+  createVariant: (id: string, vid: string, label: string, mitigation: MitigationIn) =>
+    request<ScenarioVersion>('POST', `${vp(id)}/versions/${encodeURIComponent(vid)}/variants`, { label, mitigation }),
+  compare: (id: string, baseline: string, variant: string) =>
+    request<Comparison>('GET', `${vp(id)}/compare?baseline=${encodeURIComponent(baseline)}&variant=${encodeURIComponent(variant)}`),
+}

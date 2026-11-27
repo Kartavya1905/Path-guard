@@ -238,3 +238,21 @@ main.full.with-banner { height: calc(100vh - 3.25rem - 2.1rem); }
 .via-delay { color: #8a5a00 !important; }
 .cascade .step { border: 1px solid #c3c9d2; border-radius: 6px; padding: 0.1rem 0.4rem; background: #fff; }
 .cascade .step.kind-failure { border-color: #b42318; background: #fdf1f0; }
+
+.versions { padding: 0.75rem 1rem 2rem; }
+.versions .card h4 { margin: 0.75rem 0 0.35rem; font-size: 0.88rem; }
+.version-list li { padding: 0.25rem 0; border-bottom: 1px solid #eef0f3; }
+.inline-form label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.88rem; }
+.inline-form select { width: auto; }
+.change-row { display: grid; grid-template-columns: 2fr 0.5fr 1.5fr; gap: 0.4rem; margin-bottom: 0.4rem; }
+.delta-cards { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.75rem 0; }
+.delta-card { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 0.2rem; border: 1px solid #a6dcb8; background: #effaf3; border-radius: 8px; padding: 0.6rem 0.8rem; }
+.delta-card strong { font-size: 1.4rem; }
+.delta-card.muted-card { border-color: #dde1e7; background: #fafbfc; }
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 0.5rem; }
+.cmp-table th, .cmp-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+.cmp-table thead th { background: #fafbfc; }
+.cmp-table tbody th { font-weight: 600; color: #3b4452; width: 28%; }
+.chg-added td:nth-child(2) { color: #1f7a3f; }
+.chg-removed td:nth-child(2) { color: #b42318; }
+.chg-changed td:nth-child(2) { color: #8a5a00; }
