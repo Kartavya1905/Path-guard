@@ -14,7 +14,6 @@ Results of checks that were **actually run** on 2026-11-26. The final full re-ru
 | Production build | `frontend`: `npm run build` | built |
 | Browser tests, Vite dev server | `frontend`: `npm run test:e2e` | **13 passed** |
 | Browser tests, Docker Compose stack (port 3600) | `frontend`: `$env:PW_BASE_URL = "http://127.0.0.1:3600"; npm run test:e2e` | **13 passed** |
-| Browser tests, hosted image in visitor mode on a **fresh, empty database** (port 8650) | see [hosting.md](hosting.md), "Try the hosted image locally" | **13 passed**. On start-up it ran migrations 0001 → 0002 → 0003, purged nothing, started in production / visitor mode with AI off |
 | Accessibility (axe-core, WCAG 2.1 A and AA) | part of `npm run test:e2e` (`e2e/a11y.spec.ts`) | **0 violations** on the projects list, new-project form (with validation errors), plan form, workspace (map, risk selected, link estimate editor, Worst cases, Versions, Outcomes) and report. A sanity run confirmed the scanner catches a planted violation |
 | Narrow screens | `e2e/a11y.spec.ts` | Phone width (375 px): no sideways scrolling on projects, new project, plan form or report. Tablet width (768 px): the workspace stacks the map first, then details, then plan and suggestions |
 | Dependency checks | `backend`: `.\.venv\Scripts\python.exe -m pip check`; `frontend`: `npm audit` | No broken requirements; 0 known vulnerabilities |
@@ -58,6 +57,10 @@ The browser tests include `e2e/demo.spec.ts`, which runs the whole [demo script]
   - The next request took 2.6 s. Every item came back as a duplicate and was rejected. That request wasn't served from the cache, because the map had changed (new suggestions), so the input differed.
   - Before raising the default timeout to 120 s, the very first call, which includes loading the model, timed out at 60 s and correctly left the map unchanged.
 - AI was switched back off afterwards, and all browser tests passed with it off.
+- **Learning from past reviewed risks (2026-11-28):**
+  - 6 more tests cover choosing similar accepted risks, turning rejected ones into an "avoid" list, ignoring undecided suggestions, skipping examples whose text has numbers, determinism, trimming examples first when the prompt is too long, never using another user's projects, only opted-in projects for a remote model, and switching it off. The backend total is now **189 passed**, and the browser tests pass (13 on dev, 13 on Compose).
+  - A real run with `qwen2.5:1.5b` on a new checkout project picked the seeded launch's accepted "Release defect or failed rollback" as its example (similarity 0.34) and took 20 s.
+  - The model's own suggestions were all rejected as duplicates of the rule engine's existing risks. Retrieval works; the small default model limits the quality of its suggestions.
 
 ## Responsiveness
 
@@ -83,7 +86,7 @@ Two performance fixes came out of this step:
 ## Not verified here
 
 - **Human testing: pending.** See [pilot-plan.md](pilot-plan.md).
-- **The hosted site on Render and Neon:** waiting for the owner's accounts. The same image passed all browser tests locally in production / visitor mode.
+- **Deployment:** not set up. The single-container hosting files (root `Dockerfile`, `render.yaml`, `docs/hosting.md`) were removed on 2026-11-28, to be revisited after the web app work. Before that, the hosted image passed all browser tests locally on a fresh database.
 - **Other browsers:** only Edge (Chromium) was tested; Firefox and Safari weren't. Running them would mean downloading Playwright's browser builds.
 - **Manual accessibility:** there has been no screen-reader or keyboard-only walkthrough. The automated axe scan finds only part of the possible issues.
 - **Known warning:** the backend test run shows one third-party deprecation warning (Starlette's test client and httpx). It doesn't affect PathGuard.

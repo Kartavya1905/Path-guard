@@ -1,6 +1,6 @@
 """Delete expired public-demo data. Does nothing unless visitor identity is on.
 
-Run: python -m app.purge (the hosted container runs it on start).
+Run: python -m app.purge (for a visitor-mode deployment; run it on start).
 """
 
 from app.auth import purge_expired_visitors

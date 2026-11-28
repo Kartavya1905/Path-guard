@@ -34,7 +34,7 @@ We also note time to first generated map, any wrong turn, and every place the wo
 
 ## Data handling
 
-- Use the local install, or the hosted demo with its per-browser privacy and 7-day expiry.
+- Use the local install.
 - Participants shouldn't enter real confidential project data.
 - Notes are kept without names.
 

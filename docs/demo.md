@@ -1,6 +1,6 @@
 # Demo script
 
-This takes about 10 minutes. It works locally (http://localhost:3600 after `docker compose up -d --build`) and on the hosted demo. Every number in the seeded examples is hypothetical and labeled so.
+This takes about 10 minutes. It runs locally: http://localhost:3600 after `docker compose up -d --build`. Every number in the seeded examples is hypothetical and labeled so.
 
 The same script runs automatically as `frontend/e2e/demo.spec.ts`. Steps 2–6 there use a copy of the seeded launch, so the example stays clean.
 

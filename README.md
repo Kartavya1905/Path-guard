@@ -49,7 +49,6 @@ docker compose down -v
 | [docs/verification.md](docs/verification.md) | Checks actually run, with results and responsiveness timings |
 | [docs/pilot-plan.md](docs/pilot-plan.md) | Pilot with designers and project managers across three workflows (pending) |
 | [docs/security.md](docs/security.md) | Local protections, and what hosting for real teams would require |
-| [docs/hosting.md](docs/hosting.md) | Free public demo on Render + Neon |
 
 ## Features
 
@@ -78,7 +77,7 @@ docker compose down -v
 
 - **Human pilot testing:** pending ([plan](docs/pilot-plan.md)).
 - **Optional AI:** quality depends on the local model. The default `qwen2.5:1.5b` is fast but often restates existing steps, which are then rejected as duplicates; `llama3.1:8b` gives better suggestions but is slower. Only Ollama is implemented.
-- **Hosted demo:** ready, but waiting for the Render and Neon accounts.
+- **Deployment:** not set up yet; it will be planned once the web app is finished. PathGuard runs locally with Docker Compose.
 - **Real sign-in (OIDC):** not implemented. The public demo uses anonymous per-browser identity, which isn't authentication ([security.md](docs/security.md)).
 - **Range results:** these are outer bounds, with each estimate independent within its range, and can be wide. Exact results need point estimates.
 - **Outcome candidates:** these update one branch at a time. The other branches of a complete decision are entered by hand.
@@ -274,6 +273,11 @@ AI suggestions add hazards, missing steps and recovery branches to the **same re
   - Recoveries become a suggested branch with unknown estimates and a retry limit.
   - Nothing is modeled until someone accepts it, and its estimates stay unknown until a person supplies them.
 - **Failures change nothing:** if the model is missing, slow (120-second timeout) or returns invalid output, the map is left unchanged and the error says so.
+- **Learning from your past reviews (no training):** each request also includes up to 4 risks you **accepted or edited** on your *other* projects, as examples, and up to 3 ideas you **rejected**, as things to avoid.
+  - They're picked by word similarity (TF-IDF) on this computer, with no embedding model or download.
+  - Only their text is used, never estimates, and examples containing numbers are skipped.
+  - Only your own projects are used. For a remote model, only projects that opted in to external processing are used.
+  - The panel lists what it learned from. Set `PATHGUARD_AI_EXAMPLES` / `PATHGUARD_AI_AVOID` to `0` to turn this off.
 - **Remote models:** a model on another host counts as remote. It only receives project data when **both** `PATHGUARD_EXTERNAL_PROCESSING_ENABLED=true` and the project's own external-processing opt-in are set. The hosted demo keeps AI off.
 
 ### Validation
@@ -365,10 +369,6 @@ Open a project from the Projects page to get the workspace at `#/p/<id>`. The pl
 - Docker Desktop
 - Node.js 22.12+ with npm
 - Python 3.12 (`py -3.12`)
-
-## Free online hosting
-
-[docs/hosting.md](docs/hosting.md) explains how to run PathGuard online at $0 as a public demo, on Render (free web service) and Neon (free Postgres). The root `Dockerfile` builds a single container that serves the web app and the API together. `render.yaml` sets it up in visitor mode, where each browser gets its own private anonymous account and data expires after 7 days.
 
 ## Run everything with Docker
 
@@ -483,7 +483,7 @@ Settings are environment variables with the `PATHGUARD_` prefix. They are define
 | `PATHGUARD_VISITOR_IDENTITY_ENABLED` | `false` | Public demo: a private anonymous account per browser. Needs `PATHGUARD_SECRET_KEY` (32+ characters) and demo identity off |
 | `PATHGUARD_VISITOR_RETENTION_DAYS` | `7` | Visitor projects untouched this long are deleted |
 | `PATHGUARD_VISITOR_PROJECT_LIMIT` | `20` | Projects per browser in the public demo |
-| `PATHGUARD_STATIC_DIR` | unset | Serve a built web app from the API (set by the root `Dockerfile`) |
+| `PATHGUARD_STATIC_DIR` | unset | Optionally serve a built web app from the API process |
 | `PATHGUARD_AI_ENABLED` | `false` | Optional AI suggestions, called only on request |
 | `PATHGUARD_AI_BASE_URL` / `PATHGUARD_AI_MODEL` | `http://127.0.0.1:11434` / `qwen2.5:1.5b` | Ollama address and model. A non-local host counts as remote |
 | `PATHGUARD_AI_TIMEOUT_SECONDS`, `PATHGUARD_AI_MAX_INPUT_CHARS`, `PATHGUARD_AI_MAX_OUTPUT_TOKENS` | `120`, `6000`, `700` | Caps on each request |

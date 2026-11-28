@@ -67,9 +67,9 @@ Storage rules:
 | `AnalysisPanel.tsx`, `WorstCases.tsx`, `VersionsPanel.tsx`, `OutcomesPanel.tsx`, `ReportPage.tsx` | Results, ranking, comparison, outcomes and the printable report |
 | `prob.ts` | Exact percent ↔ fraction conversion on decimal strings, with no floating point |
 
-## Deployment shapes
+## Running it
 
 - **Local:** `compose.yaml` runs Postgres, the API (port 8600) and nginx serving the built app (port 3600). Everything is bound to 127.0.0.1.
-- **Free public demo:** the root `Dockerfile` builds one container, where the API serves the app, configured by `render.yaml` with Neon Postgres. It uses visitor identity, and data expires. See [hosting.md](hosting.md).
+- **Deployment:** not set up yet. It will be planned once the web app is finished. Visitor identity (`PATHGUARD_VISITOR_IDENTITY_ENABLED`) is already available for a future public demo.
 
-Optional AI suggestions (plan step 11) aren't built. Nothing calls a model, and every calculation is local.
+Optional AI suggestions (plan step 11) are built but off by default. They use a local Ollama model only when someone asks; every calculation is local.
