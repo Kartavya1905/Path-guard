@@ -13,6 +13,7 @@ with an unknown likelihood.
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -28,6 +29,12 @@ from pathguard_engine.model import (
 from pathguard_engine.retrieval import SourceProject, _words, select_examples
 
 CASES_FILE = Path(__file__).with_name("cases.txt")
+# Similarity thresholds, set from measurements (see docs/verification.md): projects like the
+# library's own cases usually score above CLOSE_SCORE on their best match; unrelated
+# projects (home renovation, gardening) stay below it. Below MIN_SCORE nothing is shown.
+CLOSE_SCORE = 0.12
+MIN_SCORE = 0.065
+MAX_LOOSE = 3
 CATEGORIES = frozenset("""scope dependency vendor approval testing data staffing security
 performance compliance communication budget schedule quality adoption logistics integration
 release""".split())
@@ -62,6 +69,7 @@ class LibrarySuggestion(BaseModel):
     consequence: str
     control: str | None
     score: float
+    match: Literal["close", "loose"]  # loose: a weak, cross-domain idea
     step_node_id: str | None
     step_label: str | None
 
@@ -160,38 +168,52 @@ def _query(plan: Plan, graph: ScenarioGraph, focus_node_id: str | None) -> str:
     return " ".join([p.context.domain or "", p.start, p.goal, *labels])
 
 
-def _best_step(graph: ScenarioGraph, text: str, focus: str | None) -> ScenarioNode | None:
-    """The modeled step (or start) in this map whose label best matches the risk text."""
+def _best_step(graph: ScenarioGraph, risk_text: str, source_step: str,
+               focus: str | None) -> ScenarioNode | None:
+    """The modeled step (or start) that best fits the risk.
+
+    The risk's own title and trigger decide first; the name of the step it came from in the
+    library only breaks ties; then the selected step, then real steps over the start.
+    """
     steps = [n for n in graph.nodes if modeled(n) and n.kind in ("step", "start")]
     if not steps:
         return None
-    words = set(_words(text))
-    scored = sorted(steps, key=lambda n: (-len(words & set(_words(n.label))),
+    own, origin = set(_words(risk_text)), set(_words(source_step))
+    scored = sorted(steps, key=lambda n: (-len(own & set(_words(n.label))),
+                                          -len(origin & set(_words(n.label))),
                                           n.id != focus, n.kind != "step"))
     return scored[0]
 
 
 def suggest(plan: Plan, graph: ScenarioGraph, focus_node_id: str | None = None,
             k: int = 5) -> list[LibrarySuggestion]:
-    """The k most relevant accepted library risks for this project, not already in its map."""
+    """The k most relevant accepted library risks for this project, not already in its map.
+
+    Matches below MIN_SCORE are dropped. When even the best match is below CLOSE_SCORE, the
+    project is unlike anything in the library: at most MAX_LOOSE suggestions are returned,
+    all marked "loose".
+    """
     case_by_title = {f"Library: {c.title}": c for c in load_cases()}
     have = {r.title.casefold() for r in graph.risks}
     accepted, _ = select_examples(_query(plan, graph, focus_node_id), list(library_sources()),
                                   accepted=k + len(have), rejected=0)
     out: list[LibrarySuggestion] = []
     for e in accepted:
-        if e.title.casefold() in have:
+        if e.title.casefold() in have or e.score < MIN_SCORE:
             continue
         case = case_by_title[e.project_title]
         risk = next(r for r in case.risks if r.title == e.title)
-        step = _best_step(graph, f"{e.step} {e.title} {e.trigger}", focus_node_id)
+        step = _best_step(graph, f"{e.title} {e.trigger}", e.step, focus_node_id)
         out.append(LibrarySuggestion(
             key=stable_id("risk", "library", case.title, e.title)[4:], case_title=case.title,
             domain=case.domain, category=risk.category, title=e.title, trigger=e.trigger,
             consequence=e.consequence, control=e.control, score=e.score,
+            match="close" if e.score >= CLOSE_SCORE else "loose",
             step_node_id=step.id if step else None, step_label=step.label if step else None))
         if len(out) >= k:
             break
+    if out and out[0].match == "loose":
+        out = out[:MAX_LOOSE]  # nothing close: show only a few clearly-labelled ideas
     return out
 
 

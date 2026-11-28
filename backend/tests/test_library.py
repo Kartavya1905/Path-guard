@@ -54,3 +54,65 @@ def test_library_matching_beats_random_picks():
         assert scored.precision > e.random_baseline.precision
         assert scored.recall > e.random_baseline.recall
         assert scored.same_domain > e.random_baseline.same_domain
+
+
+def _project(start: str, goal: str, tasks: list[str]):
+    from pathguard_engine import Plan, Project, Task, generate
+
+    plan = Plan(
+        project=Project(
+            id="prj_libcheck001", owner_id="usr_demo0001", title="t", start=start, goal=goal
+        ),
+        tasks=[Task(id=f"tsk_libcheck{i:03d}", title=t, position=i) for i, t in enumerate(tasks)],
+    )
+    return plan, generate(plan, None).graph
+
+
+def test_words_fold_plurals_and_skip_filler():
+    from pathguard_engine.retrieval import _words
+
+    assert _words("Set up push notifications") == ["push", "notification"]
+    assert _words("New kitchen ready") == ["kitchen"]
+    assert _words("Business process") == ["business", "process"]  # -ss is kept
+
+
+def test_known_project_gets_close_matches_on_the_right_steps():
+    plan, graph = _project(
+        "Mobile app ready for beta testing",
+        "App live in the App Store and Google Play",
+        [
+            "Build the app",
+            "Beta test on real devices",
+            "Set up push notifications",
+            "App store submission and review",
+        ],
+    )
+    found = {s.title: s for s in suggest(plan, graph, None, 5)}
+    assert len(found) == 5 and all(s.match == "close" for s in found.values())
+    assert found["Push notification setup delayed"].step_label == "Set up push notifications"
+    assert found["Store review rejection"].step_label == "App store submission and review"
+    assert found["Too few test devices"].step_label == "Beta test on real devices"
+
+
+def test_unrelated_project_gets_only_a_few_loose_ideas():
+    plan, graph = _project(
+        "Kitchen renovation budget approved",
+        "New kitchen installed and usable",
+        [
+            "Choose a contractor",
+            "Order cabinets and appliances",
+            "Demolition and new plumbing",
+            "Install kitchen and pass inspection",
+        ],
+    )
+    found = suggest(plan, graph, None, 5)
+    assert 0 < len(found) <= 3 and all(s.match == "loose" for s in found)
+
+
+def test_very_different_project_gets_nothing():
+    plan, graph = _project(
+        "Garden plan agreed",
+        "Vegetable garden producing food",
+        ["Prepare soil", "Plant seedlings", "Water and weed"],
+    )
+    assert suggest(plan, graph, None, 5) == []

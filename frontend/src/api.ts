@@ -474,6 +474,7 @@ export const aiApi = {
 export type LibrarySuggestion = {
   key: string; case_title: string; domain: string; category: string; title: string
   trigger: string; consequence: string; control: string | null; score: number
+  match: 'close' | 'loose' // loose: a weak idea from a different kind of project
   step_node_id: string | null; step_label: string | null
 }
 

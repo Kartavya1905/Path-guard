@@ -262,14 +262,19 @@ Each case has a start, goal, tasks with owner roles, **3 risks a team accepted**
 "Learning" here means retrieval, not model training:
 
 - **Without AI:** the workspace's **From the risk library** panel shows the 5 accepted risks from the most similar cases. They are matched by word similarity to your start, goal and steps, or to the selected step. Each is placed on your best-matching step. **Add to review** puts one into the normal review list as a *suggested* risk with unknown likelihood.
+- **Close vs loose:** suggestions are rated by word similarity, with singular and plural treated alike and filler words like "new" or "approved" ignored.
+  - Close matches score 0.12 or more. Projects like the library's cases usually reach this; 9 in 10 cases' best match scores 0.13 or more.
+  - Below that, the project is unlike anything in the library. At most 3 **loose ideas** are shown, clearly labelled.
+  - Below 0.065, nothing is shown and the panel says so.
+  - Measured examples: a mobile app release gets 5 close matches on the right steps; a kitchen renovation gets 2 loose budget ideas; a vegetable garden gets none.
 - **With the optional AI:** the same library joins your own reviewed risks as examples for the local model (`PATHGUARD_AI_USE_LIBRARY`, default on).
 
 **How good are the suggestions?** `python -m pathguard_engine.library.evaluate` runs a leave-one-out test. Each case is hidden in turn, the library suggests 5 risks from its start, goal and task names, and the result is compared with the kinds of risk that case's team accepted. Random picks are the baseline:
 
 | Method | Hit rate | Precision | Recall | Same domain |
 |---|---|---|---|---|
-| Library matching, with domain | 91% | 37% | 48% | 36% |
-| Library matching, no domain | 92% | 37% | 48% | 29% |
+| Library matching, with domain | 91% | 37% | 47% | 35% |
+| Library matching, no domain | 92% | 37% | 47% | 28% |
 | Random picks (baseline) | 69% | 24% | 33% | 8% |
 
 Hit rate is the share of cases where at least one of the 5 suggestions is the right kind of risk. This measures relevance to the library's own examples, not real-world accuracy. The matching clearly beats random, but it's a starting point: grow the library, or add your own reviewed projects, to improve it.

@@ -508,3 +508,12 @@ details > summary { cursor: pointer; font-weight: 600; color: var(--text-2); }
   .brand-tag { display: none; }
   .project-list { grid-template-columns: 1fr; }
 }
+
+/* risk library: weak, cross-domain matches are visibly marked */
+.library-list li.loose { border-style: dashed; background: var(--surface-2); }
+.tag.loose-tag { background: var(--warn-soft); color: var(--warn-ink); }
+.library-loose-note, .library-none {
+  margin: 0 0 0.6rem; padding: 0.5rem 0.7rem; border-radius: var(--radius-sm);
+  background: var(--warn-soft); color: var(--warn-ink); border: 1px solid #f0d29b;
+}
+.library-none { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }

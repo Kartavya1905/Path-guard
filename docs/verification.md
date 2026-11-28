@@ -76,11 +76,23 @@ The browser tests include `e2e/demo.spec.ts`, which runs the whole [demo script]
 
 | Method | Hit rate | Precision | Recall | Same domain |
 |---|---|---|---|---|
-| Library matching, with domain | 91% | 37% | 48% | 36% |
-| Library matching, no domain | 92% | 37% | 48% | 29% |
+| Library matching, with domain | 91% | 37% | 47% | 35% |
+| Library matching, no domain | 92% | 37% | 47% | 28% |
 | Random picks (baseline) | 69% | 24% | 33% | 8% |
 
 - **What this measures:** relevance to the library's own examples, not real-world accuracy.
+- **Browser test on 2026-11-28:**
+  - A mobile app release got 5 relevant mobile suggestions, but one was placed on the wrong step.
+  - A kitchen renovation got 2 useful and 3 irrelevant suggestions. The irrelevant ones matched only on common words like "new".
+- **Fix:**
+  - Singular and plural words are now treated alike, and filler words are ignored.
+  - Matches are rated close or loose, and nothing below a minimum score is shown.
+  - Each suggestion is placed using its own title and trigger first.
+- **After the fix:**
+  - Mobile: 5 close matches, all on the right steps.
+  - Kitchen: 2 loose budget ideas, labelled as such.
+  - Garden: none.
+  - 4 tests guard this. The backend total is now **200 passed**.
 
 ## Responsiveness
 

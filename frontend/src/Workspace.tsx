@@ -274,21 +274,34 @@ export default function Workspace({ projectId }: Props) {
           onSelect={setSelection} onReview={review}
           onAdd={(risk) => { update((g) => ({ ...g, risks: [...g.risks, risk] })); setSelection({ kind: 'risk', id: risk.id }) }}
           selectedNode={selection?.kind === 'node' ? selection.id : null} />
-        {!empty && library && library.length > 0 && (
+        {!empty && library && (
           <section className="panel-section" aria-labelledby="lib-h">
             <h2 id="lib-h">From the risk library</h2>
             <p className="muted small">
               Risks teams accepted in similar projects (100 example cases)
               {focusNode ? ', matched to the selected step' : ''}. No AI and no numbers: you decide.
             </p>
+            {library.length === 0 && (
+              <p className="small library-none" role="status">
+                Nothing in the library is close to this project yet. Review the rule suggestions above or
+                add your own risks; reviewed risks from your projects help future suggestions.
+              </p>
+            )}
+            {library.length > 0 && library.every((s) => s.match === 'loose') && (
+              <p className="small library-loose-note" role="note">
+                No close matches: this project is unlike the library's cases. These are loose ideas
+                from other kinds of projects. Check that they really apply.
+              </p>
+            )}
             <ul className="library-list">
               {library.map((s) => (
-                <li key={s.key}>
+                <li key={s.key} className={s.match === 'loose' ? 'loose' : undefined}>
                   <strong>{s.title}</strong>
                   <div className="small muted">{s.trigger}</div>
                   <div className="risk-meta">
                     <span className="tag">{s.category}</span>
                     <span className="tag example">{s.domain}</span>
+                    {s.match === 'loose' && <span className="tag loose-tag">loose idea</span>}
                     {s.step_label && <span className="small muted">at “{s.step_label}”</span>}
                   </div>
                   <div className="small muted">Seen in: {s.case_title}</div>

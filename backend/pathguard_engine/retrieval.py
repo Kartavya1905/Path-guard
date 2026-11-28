@@ -23,7 +23,10 @@ from pathguard_engine.model import ScenarioGraph
 WORD = re.compile(r"[a-z0-9]+")
 STOP = frozenset("""a an and are as at be by for from has have in into is it its of on or that
 the their then there this to was were will with without not no can could may might should would
-our your we you they them he she i if when while after before during than so up out over""".split())
+our your we you they them he she i if when while after before during than so up out over
+# words that appear in almost any plan and say nothing about its risks
+new first project approved ready live set get make made all each every one some via using
+start started done complete completed""".split())
 
 
 class SourceProject(BaseModel):
@@ -47,8 +50,17 @@ class Example(BaseModel):
     score: float
 
 
+def _stem(word: str) -> str:
+    """Very small plural folding, so 'notifications' matches 'notification'."""
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("s") and not word.endswith(("ss", "us", "is")):
+        return word[:-1]
+    return word
+
+
 def _words(text: str) -> list[str]:
-    return [w for w in WORD.findall(text.lower()) if w not in STOP and len(w) > 1]
+    return [_stem(w) for w in WORD.findall(text.lower()) if w not in STOP and len(w) > 1]
 
 
 def _candidates(projects: list[SourceProject]) -> list[tuple[Example, str]]:
