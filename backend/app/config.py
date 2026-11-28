@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = 120  # a small local model on a CPU can take ~30–60 s
     ai_max_input_chars: int = 6000
     ai_max_output_tokens: int = 700
+    # Learn from your past reviewed risks (no training): how many accepted examples and
+    # rejected ideas from your other projects go into each AI request. 0 turns it off.
+    ai_examples: int = 4
+    ai_avoid: int = 3
 
     @field_validator("database_url")
     @classmethod

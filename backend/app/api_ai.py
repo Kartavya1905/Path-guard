@@ -8,25 +8,29 @@ failure leaves the map unchanged and the rules-only workflow fully usable.
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import NonNegativeInt
+from pydantic import BaseModel, NonNegativeInt
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app import audit
 from app.ai import ProviderError, get_provider
 from app.api import _graph_out, _load_plan, _store_graph
 from app.auth import SessionDep, UserDep, project_access
 from app.config import get_settings
-from app.models import AiCacheRow
+from app.models import AiCacheRow, Member, ProjectRow, User
 from app.schemas import GraphOut, In
 from pathguard_engine import ScenarioGraph
 from pathguard_engine.ai import (
     OUTPUT_SCHEMA,
     PROMPT_VERSION,
+    _nearby,
     build_prompt,
     cache_key,
     parse,
     to_suggestions,
 )
 from pathguard_engine.ids import EntityId
+from pathguard_engine.retrieval import SourceProject, select_examples
 
 router = APIRouter(prefix="/api")
 
@@ -36,12 +40,44 @@ class AiRequest(In):
     revision: NonNegativeInt
 
 
+class ExampleUsed(BaseModel):
+    project_title: str
+    title: str
+    decision: str
+    score: float
+
+
 class AiResult(GraphOut):
     added: list[str]
     rejected: list[str]
     cached: bool
     provider: str
     model: str
+    examples_used: list[ExampleUsed] = []  # past reviewed risks shown to the model
+
+
+def _sources(session: Session, user: User, current: ProjectRow, remote: bool,
+             limit: int = 50) -> list[SourceProject]:
+    """The asking user's own other projects, most recently updated first.
+
+    Membership-based, so nobody else's projects are ever used. For a remote model only
+    projects that opted in to external processing are included.
+    """
+    q = (select(ProjectRow).join(Member, Member.project_id == ProjectRow.id)
+         .where(Member.user_id == user.id, ProjectRow.id != current.id)
+         .order_by(ProjectRow.updated_at.desc()).limit(limit))
+    if remote:
+        q = q.where(ProjectRow.external_processing_opt_in.is_(True))
+    out = []
+    for p in session.scalars(q):
+        try:
+            graph = ScenarioGraph.model_validate(p.graph)
+        except ValueError:
+            continue
+        domain = (p.context or {}).get("domain") or ""
+        out.append(SourceProject(project_id=p.id, title=p.title,
+                                 context_text=f"{p.start} {p.goal} {domain}", graph=graph))
+    return out
 
 
 @router.post("/projects/{project_id}/ai/suggestions", response_model=AiResult)
@@ -68,7 +104,24 @@ def ai_suggestions(project_id: str, body: AiRequest, session: SessionDep,
                                              "project has opted in."})
 
     plan, graph = _load_plan(session, row), ScenarioGraph.model_validate(row.graph)
-    prompt = build_prompt(plan, graph, body.focus_node_id, settings.ai_max_input_chars)
+    learned, avoided = [], []
+    if settings.ai_examples > 0 or settings.ai_avoid > 0:
+        near = _nearby(graph, body.focus_node_id)
+        query = " ".join([plan.project.start, plan.project.goal,
+                          plan.project.context.domain or "", *(n.label for n in near)])
+        learned, avoided = select_examples(
+            query, _sources(session, user, row, provider.remote),
+            accepted=settings.ai_examples, rejected=settings.ai_avoid)
+    prompt = build_prompt(
+        plan, graph, body.focus_node_id, settings.ai_max_input_chars,
+        learn_from=[{k: v for k, v in {"step": e.step, "title": e.title,
+                                       "trigger": e.trigger, "consequence": e.consequence,
+                                       "control": e.control}.items() if v}
+                    for e in learned],
+        avoid=[e.title for e in avoided])
+    used = [ExampleUsed(project_title=e.project_title, title=e.title, decision=e.decision,
+                        score=e.score)
+            for e in learned[:prompt.examples_sent] + avoided[:prompt.avoid_sent]]
     key = cache_key(provider.name, provider.model, prompt)
     hit = session.get(AiCacheRow, (row.id, key))
     if hit is not None:
@@ -109,8 +162,9 @@ def ai_suggestions(project_id: str, body: AiRequest, session: SessionDep,
                  target_kind="project", target_id=row.id,
                  detail={"provider": provider.name, "model": provider.model,
                          "prompt_version": PROMPT_VERSION, "cached": cached,
-                         "added": len(added), "rejected": len(conv.rejected)})
+                         "added": len(added), "rejected": len(conv.rejected),
+                         "examples": prompt.examples_sent, "avoid": prompt.avoid_sent})
     out = _graph_out(session, row, graph)
     session.commit()
     return AiResult(**out.model_dump(), added=added, rejected=conv.rejected, cached=cached,
-                    provider=provider.name, model=provider.model)
+                    provider=provider.name, model=provider.model, examples_used=used)

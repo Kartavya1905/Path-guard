@@ -1,7 +1,7 @@
 import type { XYPosition } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
-  ApiError, aiApi, analysisApi, api, explorerApi, type AiStatus, mapApi, newMapId, type Analysis, type Explorer, type DraftOut, type GraphOut, type Me, type Readiness,
+  ApiError, aiApi, analysisApi, api, explorerApi, type AiExample, type AiStatus, mapApi, newMapId, type Analysis, type Explorer, type DraftOut, type GraphOut, type Me, type Readiness,
   type RiskCandidate, type Role, type ScenarioGraph, type Severity,
 } from './api'
 import {
@@ -69,6 +69,7 @@ export default function Workspace({ projectId }: Props) {
   // Optional AI: only shows when the server has it switched on. Never called automatically.
   const [ai, setAi] = useState<AiStatus | null>(null)
   const [aiNote, setAiNote] = useState<string[]>([])
+  const [aiLearned, setAiLearned] = useState<AiExample[] | null>(null)
   useEffect(() => {
     let live = true
     aiApi.status().then((s) => { if (live) setAi(s) }, () => undefined)
@@ -137,6 +138,7 @@ export default function Workspace({ projectId }: Props) {
     applyServer(out)
     setNotice(`AI added ${out.added.length} suggestion(s) to review${out.rejected.length ? `, ${out.rejected.length} rejected` : ''}${out.cached ? ' (reused a stored reply, no new model call)' : ''}. They are hypotheses with no probability until you review them.`)
     setAiNote(out.rejected)
+    setAiLearned(out.examples_used)
   })
 
   const save = () => run(async () => {
@@ -261,9 +263,26 @@ export default function Workspace({ projectId }: Props) {
             <p className="muted small">
               Asks {ai.local ? 'the local' : 'the remote'} model ({ai.model}) for hazards, missing steps and recoveries
               {selection?.kind === 'node' ? ' around the selected step' : ' along the main path'}. It runs only when you click,
-              sends only nearby steps and constraints, and never gives numbers. Results join the review list above.
+              sends only nearby steps and constraints, and never gives numbers. It also learns from risks you accepted
+              or rejected on your other projects (text only). Results join the review list above.
             </p>
             <button type="button" disabled={busy || dirty} onClick={askAi}>Suggest with AI</button>
+            {aiLearned !== null && (
+              aiLearned.length === 0 ? (
+                <p className="muted small">No similar reviewed risks from your other projects yet, so it worked from this map alone.</p>
+              ) : (
+                <details className="small" open>
+                  <summary>Learned from {aiLearned.filter((e) => e.decision === 'accepted').length} of your past accepted risks{aiLearned.some((e) => e.decision === 'rejected') ? ` and avoided ${aiLearned.filter((e) => e.decision === 'rejected').length} rejected idea(s)` : ''}</summary>
+                  <ul className="plain-list">{aiLearned.map((e) => (
+                    <li key={`${e.decision}-${e.project_title}-${e.title}`}>
+                      <span className={`tag status-${e.decision}`}>{e.decision === 'accepted' ? 'example' : 'avoid'}</span> {e.title}
+                      <span className="muted"> · from “{e.project_title}”</span>
+                    </li>
+                  ))}</ul>
+                  <p className="muted">Only text from your own projects is used, never their numbers. Nothing is trained; the closest matches are picked by word similarity on this computer.</p>
+                </details>
+              )
+            )}
             {aiNote.length > 0 && (
               <details className="small"><summary>Rejected from the model's reply ({aiNote.length})</summary>
                 <ul className="plain-list">{aiNote.map((r) => <li key={r}>{r}</li>)}</ul>

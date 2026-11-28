@@ -29,7 +29,7 @@ from pathguard_engine.model import (
     Transition,
 )
 
-PROMPT_VERSION = "pathguard-ai-1"
+PROMPT_VERSION = "pathguard-ai-2"  # 2: adds learn_from / avoid
 MAX_NODES = 25
 MAX_SUGGESTIONS = 6
 # Anything that reads like a probability: "30%", "30 percent", "probability of 0.3",
@@ -75,6 +75,9 @@ SYSTEM = " ".join([
     "Use only node IDs from the list.",
     "Never give probabilities, percentages, likelihood numbers or estimates of any kind.",
     "Do not repeat existing risks.",
+    "learn_from lists risks this team accepted on similar projects: treat them as examples of"
+    " useful suggestions and adapt the ideas to these steps instead of copying them.",
+    "avoid lists ideas the team rejected before: do not suggest them again.",
 ])
 
 
@@ -82,6 +85,8 @@ class Prompt(BaseModel):
     messages: list[dict[str, str]]
     node_ids: list[str]
     digest: str  # identifies the input, for caching
+    examples_sent: int = 0
+    avoid_sent: int = 0
 
 
 class Conversion(BaseModel):
@@ -112,8 +117,13 @@ def _nearby(graph: ScenarioGraph, focus: str | None) -> list[ScenarioNode]:
 
 
 def build_prompt(plan: Plan, graph: ScenarioGraph, focus_node_id: str | None,
-                 max_chars: int = 6000) -> Prompt:
-    """Compact prompt with only the relevant task, constraints and nearby nodes."""
+                 max_chars: int = 6000, *, learn_from: list[dict] | None = None,
+                 avoid: list[str] | None = None) -> Prompt:
+    """Compact prompt with only the relevant task, constraints and nearby nodes.
+
+    `learn_from` / `avoid` carry text-only examples from the team's past reviewed risks
+    (see retrieval.py). They are the first thing trimmed when the prompt is too long.
+    """
     p, ctx = plan.project, plan.project.context
     near = _nearby(graph, focus_node_id)
     constraints = {k: v for k, v in {
@@ -128,7 +138,17 @@ def build_prompt(plan: Plan, graph: ScenarioGraph, focus_node_id: str | None,
         "nodes": [{"id": n.id, "kind": n.kind, "label": n.label} for n in near],
         "existing_risks": [r.title for r in graph.risks if r.review_status != "rejected"][:30],
     }
+    if learn_from:
+        payload["learn_from"] = list(learn_from)
+    if avoid:
+        payload["avoid"] = list(avoid)
     text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    while len(text) > max_chars and (payload.get("learn_from") or payload.get("avoid")):
+        if payload.get("avoid"):
+            payload["avoid"] = payload["avoid"][:-1]
+        else:
+            payload["learn_from"] = payload["learn_from"][:-1]
+        text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     while len(text) > max_chars and payload["nodes"]:
         payload["nodes"] = payload["nodes"][:-1]
         payload["existing_risks"] = payload["existing_risks"][:10]
@@ -136,7 +156,9 @@ def build_prompt(plan: Plan, graph: ScenarioGraph, focus_node_id: str | None,
     text = text[:max_chars]
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": text}]
     digest = hashlib.sha256(json.dumps(messages, sort_keys=True).encode()).hexdigest()
-    return Prompt(messages=messages, node_ids=[n["id"] for n in payload["nodes"]], digest=digest)
+    return Prompt(messages=messages, node_ids=[n["id"] for n in payload["nodes"]], digest=digest,
+                  examples_sent=len(payload.get("learn_from", [])),
+                  avoid_sent=len(payload.get("avoid", [])))
 
 
 def cache_key(provider: str, model: str, prompt: Prompt) -> str:

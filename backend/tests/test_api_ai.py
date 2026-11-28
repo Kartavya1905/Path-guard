@@ -6,8 +6,9 @@ import pytest
 
 from app.ai import ProviderError
 from app.db import reset_caches
-from tests.conftest import PLANNER
+from tests.conftest import PLANNER, REVIEWER
 from tests.test_api_graph import checkout_project, generate
+from tests.test_api_projects import MIN, prereqs_payload, tasks_payload
 
 
 class FakeProvider:
@@ -16,8 +17,11 @@ class FakeProvider:
     def __init__(self, reply: str | Exception, *, remote: bool = False, model: str = "fake"):
         self.reply, self.remote, self.model, self.calls = reply, remote, model, 0
 
+    messages: list[dict] | None = None
+
     def complete(self, messages, schema, max_tokens, timeout):
         self.calls += 1
+        self.messages = messages
         if isinstance(self.reply, Exception):
             raise self.reply
         return self.reply
@@ -185,3 +189,84 @@ def test_remote_model_needs_server_and_project_opt_in(api, ai_on, monkeypatch):
         "revision"
     ]
     assert ask(api, pid, rev, step).status_code == 200 and fake.calls == 1
+
+
+def prompt_payload(fake: FakeProvider) -> dict:
+    return json.loads(fake.messages[1]["content"])
+
+
+def accepted_project(api, headers, title: str) -> str:
+    """A checkout project of `headers`' user with one accepted risk renamed to `title`."""
+    res = api.post(
+        "/api/projects",
+        headers=headers,
+        json=MIN
+        | {
+            "context": {"domain": "checkout"},
+            "tasks": tasks_payload(),
+            "prerequisites": prereqs_payload(),
+        },
+    )
+    assert res.status_code == 201, res.text
+    pid = res.json()["plan"]["project"]["id"]
+    out = generate(api, pid, 1, headers=headers).json()
+    graph = out["graph"]
+    risk = graph["risks"][0]
+    risk["title"], risk["review_status"] = title, "accepted"
+    res = api.put(
+        f"/api/projects/{pid}/graph",
+        json={"graph": graph, "revision": out["revision"]},
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    return pid
+
+
+def test_ai_learns_from_your_own_reviewed_risks_only(api, ai_on):
+    accepted_project(api, PLANNER, "Planner lesson: pin the payment API version")
+    accepted_project(api, REVIEWER, "Reviewer private lesson")  # someone else's project
+    pid, rev, step = mapped_project(api)
+    fake = ai_on(FakeProvider(json.dumps({"suggestions": []})))
+    out = ask(api, pid, rev, step).json()
+    sent = [e["title"] for e in prompt_payload(fake).get("learn_from", [])]
+    assert "Planner lesson: pin the payment API version" in sent
+    assert "Reviewer private lesson" not in json.dumps(fake.messages)
+    used = [e["title"] for e in out["examples_used"]]
+    assert "Planner lesson: pin the payment API version" in used
+    assert "likelihood" not in json.dumps(prompt_payload(fake).get("learn_from", []))
+
+
+def test_examples_can_be_switched_off(api, ai_on, monkeypatch):
+    accepted_project(api, PLANNER, "Planner lesson")
+    monkeypatch.setenv("PATHGUARD_AI_EXAMPLES", "0")
+    monkeypatch.setenv("PATHGUARD_AI_AVOID", "0")
+    reset_caches()
+    pid, rev, step = mapped_project(api)
+    fake = ai_on(FakeProvider(json.dumps({"suggestions": []})))
+    out = ask(api, pid, rev, step).json()
+    assert "learn_from" not in prompt_payload(fake) and out["examples_used"] == []
+
+
+def test_remote_model_only_learns_from_opted_in_projects(api, ai_on, monkeypatch):
+    accepted_project(api, PLANNER, "Not opted in lesson")
+    monkeypatch.setenv("PATHGUARD_EXTERNAL_PROCESSING_ENABLED", "true")
+    reset_caches()
+    pid, rev, step = mapped_project(api)
+    draft = api.get(f"/api/projects/{pid}", headers=PLANNER).json()["plan"]
+    p = draft["project"]
+    body = {
+        "title": p["title"],
+        "start": p["start"],
+        "goal": p["goal"],
+        "context": p["context"],
+        "tasks": draft["tasks"],
+        "prerequisites": draft["prerequisites"],
+        "external_processing_opt_in": True,
+        "revision": p["revision"],
+    }
+    rev = api.put(f"/api/projects/{pid}", json=body, headers=PLANNER).json()["plan"]["project"][
+        "revision"
+    ]
+    fake = ai_on(FakeProvider(json.dumps({"suggestions": []}), remote=True))
+    assert ask(api, pid, rev, step).status_code == 200
+    assert "Not opted in lesson" not in json.dumps(fake.messages)

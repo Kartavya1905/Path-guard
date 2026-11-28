@@ -452,7 +452,11 @@ export const outcomesApi = {
 // --------------------------------------------------------------------------- optional AI
 
 export type AiStatus = { enabled: boolean; provider: string; model: string | null; local: boolean }
-export type AiResult = GraphOut & { added: string[]; rejected: string[]; cached: boolean; provider: string; model: string }
+export type AiExample = { project_title: string; title: string; decision: 'accepted' | 'rejected'; score: number }
+export type AiResult = GraphOut & {
+  added: string[]; rejected: string[]; cached: boolean; provider: string; model: string
+  examples_used: AiExample[] // past reviewed risks from your other projects shown to the model
+}
 
 export const aiApi = {
   status: async (): Promise<AiStatus | null> => {
