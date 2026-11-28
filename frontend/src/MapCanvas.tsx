@@ -24,10 +24,10 @@ type MapNode = Node<NodeData, 'scenario'>
 // Colour is never the only signal: every edge carries its outcome as text, and line style
 // differs too (dashed delay, dotted recovery, thick failure).
 const OUTCOME_STYLE: Record<Outcome, { stroke: string; dash?: string; width: number }> = {
-  success: { stroke: '#1f7a3f', width: 1.6 },
-  failure: { stroke: '#b42318', width: 2.4 },
-  delay: { stroke: '#b7791f', dash: '8 4', width: 1.8 },
-  recovery: { stroke: '#1d4ed8', dash: '2 4', width: 1.8 },
+  success: { stroke: '#15803d', width: 1.6 },
+  failure: { stroke: '#c2261d', width: 2.4 },
+  delay: { stroke: '#b45309', dash: '8 4', width: 1.8 },
+  recovery: { stroke: '#0369a1', dash: '2 4', width: 2 },
   residual: { stroke: '#6b7280', dash: '4 4', width: 1.4 },
 }
 

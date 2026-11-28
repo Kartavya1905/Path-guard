@@ -348,6 +348,14 @@ export default function Workspace({ projectId }: Props) {
               onShow={(id) => { setSelection({ kind: 'risk', id }); setCenterView('map') }} />
           ) : empty ? (
             <div className="empty-map">
+              <svg className="empty-art" viewBox="0 0 120 72" aria-hidden="true" focusable="false">
+                <path d="M22 36 C40 36 44 16 62 16 H86" fill="none" stroke="#15803d" strokeWidth="2.5" />
+                <path d="M22 36 C40 36 44 56 62 56" fill="none" stroke="#c2261d" strokeWidth="3" />
+                <path d="M66 52 C80 44 82 26 86 20" fill="none" stroke="#0369a1" strokeWidth="2.5" strokeDasharray="2 4" strokeLinecap="round" />
+                <rect x="6" y="28" width="20" height="16" rx="5" fill="#0f172a" />
+                <rect x="84" y="8" width="28" height="16" rx="5" fill="#ecfdf3" stroke="#15803d" strokeWidth="2" />
+                <rect x="58" y="48" width="22" height="16" rx="5" fill="#fef2f1" stroke="#c2261d" strokeWidth="2" />
+              </svg>
               <h3>No scenario map yet</h3>
               <p className="muted">Generate one from your plan: start, tasks in dependency order, goal, plus suggested risks to review.</p>
               {canEdit && <button type="button" className="primary" disabled={busy} onClick={generate}>Generate map</button>}

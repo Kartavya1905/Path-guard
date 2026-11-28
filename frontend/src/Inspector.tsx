@@ -31,8 +31,14 @@ export default function Inspector(p: Props) {
   if (!selection) {
     return (
       <div className="inspector-empty muted">
-        <p>Select a step, a link or a risk to see its details.</p>
-        <p className="small">Drag from a node's right edge to another node to add a link.</p>
+        <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+          <rect x="4" y="10" width="22" height="14" rx="4" fill="#eef0ff" stroke="#4f46e5" strokeWidth="2" />
+          <path d="M26 17 H34 V30" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="3 3" />
+          <circle cx="34" cy="34" r="5" fill="#fff" stroke="#94a3b8" strokeWidth="2" />
+        </svg>
+        <p><strong>Nothing selected</strong></p>
+        <p>Select a step, a link or a risk to see and edit its details.</p>
+        <p className="small">Tip: drag from a node's right edge to another node to add a link.</p>
       </div>
     )
   }

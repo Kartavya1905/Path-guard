@@ -66,6 +66,7 @@ Storage rules:
 | `Inspector.tsx`, `EstimateEditor.tsx` | Editing steps, links and risks, plus estimates with provenance, notes, evidence, assumptions and mitigations |
 | `AnalysisPanel.tsx`, `WorstCases.tsx`, `VersionsPanel.tsx`, `OutcomesPanel.tsx`, `ReportPage.tsx` | Results, ranking, comparison, outcomes and the printable report |
 | `prob.ts` | Exact percent ↔ fraction conversion on decimal strings, with no floating point |
+| `index.css` | The design system: colour, type, spacing, radius and shadow tokens, then every component built from them. Outcome colours (success, failure, delay, recovery) always come with a text label or line style. All text meets WCAG AA contrast, which `e2e/a11y.spec.ts` checks |
 
 ## Running it
 

@@ -202,8 +202,8 @@ function show(v: { status: string; value?: string | null; low: string; high: str
 }
 
 const STROKE: Record<string, { color: string; dash?: string; width: number }> = {
-  success: { color: '#1f7a3f', width: 1.5 }, failure: { color: '#b42318', width: 2.5 },
-  delay: { color: '#b7791f', dash: '8 4', width: 1.8 }, recovery: { color: '#1d4ed8', dash: '2 4', width: 1.8 },
+  success: { color: '#15803d', width: 1.5 }, failure: { color: '#c2261d', width: 2.5 },
+  delay: { color: '#b45309', dash: '8 4', width: 1.8 }, recovery: { color: '#0369a1', dash: '2 4', width: 2 },
   residual: { color: '#6b7280', dash: '4 4', width: 1.4 },
 }
 

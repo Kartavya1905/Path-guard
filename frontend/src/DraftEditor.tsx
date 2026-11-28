@@ -124,7 +124,14 @@ export default function DraftEditor({ projectId }: Props) {
   return (
     <section className="page">
       <div className="page-head">
-        <h2>{projectId === null ? 'New project' : form.title || 'Project'}</h2>
+        <div>
+          <h2>{projectId === null ? 'New project' : form.title || 'Project'}</h2>
+          <p className="page-sub">
+            {projectId === null
+              ? 'Only a starting point and a goal are needed. Everything else can be added now or later.'
+              : 'Edit the plan. Then open the workspace to generate and review the scenario map.'}
+          </p>
+        </div>
         <span className="head-links">
           {projectId !== null && (
             <a href={`#/p/${projectId}`} className="button" onClick={(e) => {
@@ -157,7 +164,7 @@ export default function DraftEditor({ projectId }: Props) {
       <form onSubmit={(e) => { e.preventDefault(); void save() }} noValidate>
         <fieldset disabled={!canWrite || saving} className="plain">
           <div className="card">
-            <h3>Where you are and where you want to be</h3>
+            <h3 className="step-head"><span className="step-num" aria-hidden="true">1</span>Where you are and where you want to be</h3>
             <Field id="start" label="Starting point" required error={err('start')}>
               <textarea id="start" aria-required rows={2} value={form.start}
                 onChange={(e) => set('start', e.target.value)}
@@ -178,7 +185,7 @@ export default function DraftEditor({ projectId }: Props) {
           </div>
 
           <details className="card">
-            <summary>Optional context</summary>
+            <summary><span className="step-head" style={{ display: 'inline-flex' }}><span className="step-num" aria-hidden="true">2</span>Optional context</span></summary>
             <div className="grid">
               <Field id="domain" label="Domain" hint="“checkout” enables checkout-specific rules later.">
                 <input id="domain" list="domains" value={form.domain}
@@ -235,7 +242,7 @@ export default function DraftEditor({ projectId }: Props) {
           </details>
 
           <div className="card">
-            <h3>Tasks <span className="muted">(optional)</span></h3>
+            <h3 className="step-head"><span className="step-num" aria-hidden="true">3</span>Tasks <span className="muted">(optional)</span></h3>
             <p className="muted small">
               List order is for display only. Prerequisites below decide what must finish first.
             </p>
@@ -353,7 +360,7 @@ function PrerequisiteEditor(props: {
 
   return (
     <div className="card">
-      <h3>Prerequisites</h3>
+      <h3 className="step-head"><span className="step-num" aria-hidden="true">4</span>Prerequisites</h3>
       <p className="muted small">Connect tasks explicitly: the first must finish before the second can start.</p>
       <div className="task-row">
         <div className="field">
