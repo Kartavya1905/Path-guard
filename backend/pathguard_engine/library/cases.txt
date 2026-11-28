@@ -1,0 +1,722 @@
+# PathGuard risk library: 100 realistic project use cases (10 domains x 10).
+# Written from common project-management practice. These are illustrative examples, not recorded
+# outcomes: there are no statistics or probabilities in them.
+#
+# Format:
+#   ## domain
+#   @ title | starting point | goal
+#   T task (owner role) ; task (owner role) ; ...
+#   R task# | category | risk title | trigger | consequence | control      (a risk a team accepted)
+#   X task# | category | idea title | trigger | why it was rejected | -    (an idea a team rejected)
+# Categories: scope, dependency, vendor, approval, testing, data, staffing, security, performance,
+# compliance, communication, budget, schedule, quality, adoption, logistics, integration, release.
+
+## software
+@ Customer portal redesign | Redesign approved by product leadership | New portal live for all customers
+T Finalize UX designs (Designer) ; Build front end (Frontend dev) ; Accessibility review (QA) ; Phased rollout (Product manager)
+R 1 | scope | Late design changes | Stakeholders request new screens after sign-off | Front-end work is redone and the launch slips | Freeze scope after sign-off and route new requests to a backlog
+R 3 | compliance | Accessibility gaps found late | Accessibility checks only run at the end | Fixes delay launch or exclude disabled users | Run automated accessibility checks on every pull request
+R 4 | release | Rollout breaks existing bookmarks | Old URLs are not redirected | Customers hit error pages and contact support | Map old URLs to new ones and test redirects before rollout
+X 2 | scope | Rewrite the backend at the same time | A developer wants to modernize everything | Doubles the work and the risk for no customer benefit | -
+
+@ API version upgrade | Deprecation notice received for API v1 | All clients on the new API version
+T Inventory API consumers (Tech lead) ; Implement v2 endpoints (Backend dev) ; Migrate client apps (Mobile dev) ; Retire v1 (Ops engineer)
+R 1 | dependency | Unknown API consumers | Partners call the API without registering | Retiring v1 breaks partner integrations | Log callers for a month and contact every unknown client
+R 3 | schedule | Mobile clients update slowly | Users do not install the new app version | Old app versions keep calling v1 after retirement | Keep v1 until app adoption is high enough and show an update prompt
+R 2 | testing | Behaviour differences between versions | v2 changes defaults silently | Clients get different results and lose trust | Write contract tests that compare v1 and v2 responses
+X 4 | release | Switch off v1 on a fixed date regardless | Management wants a clean cut-over | Ignores real client usage and would break partners | -
+
+@ Internal tool replacement | Team agrees the old admin tool must go | Staff using the new admin tool daily
+T Gather workflows (Business analyst) ; Build the new tool (Developer) ; Train staff (Team lead) ; Decommission old tool (Ops engineer)
+R 1 | scope | Undocumented workflows | Staff rely on hidden features of the old tool | The new tool cannot do part of their job | Shadow each team for a day before writing requirements
+R 3 | adoption | Staff keep using the old tool | Old habits and missing shortcuts | Data ends up split across two tools | Set a read-only date for the old tool and collect feedback weekly
+R 4 | data | Data not migrated completely | Edge-case records fail to import | History is lost when the old tool is switched off | Reconcile record counts before decommissioning
+X 2 | budget | Buy a large enterprise suite instead | A vendor demo looked impressive | Far beyond the team's needs and budget | -
+
+@ Search feature launch | Search added to the product roadmap | Customers can find items with site search
+T Choose search engine (Tech lead) ; Index existing content (Backend dev) ; Tune relevance (Data analyst) ; Launch to users (Product manager)
+R 2 | performance | Indexing overloads the database | Full re-index runs during business hours | Site slows down for everyone | Index in batches overnight with rate limits
+R 3 | quality | Poor relevance at launch | Ranking tuned on too little real data | Customers cannot find items and stop using search | Test with real queries from logs before launch
+R 1 | vendor | Hosted search costs grow quickly | Pricing depends on query volume | Running cost exceeds the plan | Estimate volume early and set usage alerts
+X 4 | scope | Add voice search in version one | A stakeholder saw it in a competitor | Adds complexity before basic search works | -
+
+@ Monolith to services split | Architecture review recommends splitting the monolith | Orders module running as its own service
+T Map module boundaries (Architect) ; Extract orders service (Backend dev) ; Set up monitoring (SRE) ; Cut traffic over (Tech lead)
+R 1 | dependency | Hidden coupling between modules | Shared database tables used by many modules | The new service cannot change data safely | Map table usage before extraction and add an access layer
+R 3 | performance | Network calls add latency | Calls that were in-process now cross the network | Checkout pages become slower | Measure latency budgets and add caching where needed
+R 4 | release | Cut-over cannot be reversed easily | Data written by the new service diverges | Rolling back loses orders | Run both paths in shadow mode and keep a tested rollback
+X 2 | scope | Split all modules at once | Team wants to finish the migration quickly | Too many moving parts to test safely | -
+
+@ Feature flag platform adoption | Releases keep causing incidents | Every risky change ships behind a flag
+T Select flag tool (Tech lead) ; Integrate SDK (Developer) ; Define flag policy (Engineering manager) ; Clean up old flags (Developer)
+R 2 | performance | Flag checks slow requests | SDK fetches flags on every request | Pages get slower under load | Use local caching and streaming updates
+R 3 | quality | Flags never removed | No owner or expiry on flags | Code becomes hard to reason about | Give every flag an owner and a removal date
+R 2 | security | Flags exposed to the client | Sensitive flags evaluated in the browser | Users discover unreleased features | Evaluate sensitive flags on the server only
+X 4 | schedule | Remove all old flags in one big change | Wanting a quick cleanup | Risky change touching many features at once | -
+
+@ Payments reconciliation job | Finance reports mismatches each month end | Daily automated reconciliation in place
+T Agree matching rules (Finance analyst) ; Build reconciliation job (Data engineer) ; Validate with finance (Finance lead) ; Schedule and monitor (Ops engineer)
+R 1 | data | Matching rules unclear | Finance and engineering define a match differently | The job flags false mismatches | Write matching rules as examples signed off by finance
+R 2 | integration | Bank file formats change | The bank updates its export format | The job fails silently | Validate file format on arrival and alert on failure
+R 4 | communication | Nobody watches the alerts | Alerts go to a shared mailbox | Mismatches pile up unnoticed | Route alerts to a named owner with an escalation path
+X 3 | scope | Rebuild the accounting system | A developer suggests replacing the ledger | Far larger than the actual problem | -
+
+@ Open source library upgrade | Security scan flags an outdated framework | Application running on the supported framework version
+T Review breaking changes (Tech lead) ; Upgrade and fix code (Developer) ; Run regression tests (QA) ; Deploy to production (Ops engineer)
+R 1 | dependency | Plugins not compatible | Third-party plugins lag behind the framework | Upgrade blocked until plugins are replaced | Check every plugin's compatibility before starting
+R 3 | testing | Regression tests too thin | Low automated coverage on old features | Bugs reach production after the upgrade | Add smoke tests for key journeys before upgrading
+R 4 | release | Upgrade cannot be rolled back | Database changes made during the upgrade | A bad deploy forces an emergency fix | Separate schema changes from the code upgrade
+X 2 | schedule | Upgrade every dependency at once | Fix all warnings in one go | Too many changes to debug if something breaks | -
+
+@ Developer onboarding docs | New engineers take weeks to ship their first change | New engineers ship a change in their first week
+T Audit current setup steps (Senior dev) ; Write setup guide (Developer) ; Automate local setup (DevOps engineer) ; Test with a new hire (Engineering manager)
+R 2 | quality | Guide goes out of date | Nobody owns the documentation | New hires follow wrong steps | Review the guide every time the setup changes
+R 3 | dependency | Setup depends on one laptop type | Script assumes one operating system | Some hires still cannot set up | Test the script on every supported operating system
+R 4 | communication | Feedback never collected | New hires do not want to complain | Problems repeat for every hire | Ask each new hire for a short written review
+X 1 | budget | Hire a full-time documentation writer | Docs feel like a big problem | The team is too small to justify it | -
+
+@ Performance improvement sprint | Customers complain that pages are slow | Key pages load quickly for most users
+T Measure current speed (SRE) ; Fix slowest queries (Backend dev) ; Optimize front-end assets (Frontend dev) ; Monitor after release (SRE)
+R 1 | data | Measurements not representative | Testing only from the office network | Fixes target the wrong pages | Use real user monitoring data to pick targets
+R 2 | quality | Fixes introduce bugs | Query rewrites change results | Customers see wrong data | Compare query results before and after each change
+R 4 | performance | Speed regresses again later | No performance budget in the pipeline | Gains disappear within months | Add performance checks to continuous integration
+X 3 | scope | Rewrite the front end in a new framework | Belief that the framework is the problem | Huge effort with uncertain benefit | -
+
+## mobile
+@ Mobile app first release | App concept approved | App available in both app stores
+T Design screens (Designer) ; Build app (Mobile dev) ; Beta test (QA) ; Store submission (Product manager)
+R 4 | approval | Store review rejection | App breaks a store guideline | Launch date slips while issues are fixed | Check store guidelines early and leave buffer for review
+R 3 | testing | Too few test devices | Testing only on new phones | Crashes on older devices after launch | Test on a range of older and newer devices
+R 2 | dependency | Push notification setup delayed | Certificates and keys not ready | Key feature missing at launch | Request certificates in the first week
+X 1 | scope | Support tablets and watches in version one | Wanting maximum reach | Triples the design and testing work | -
+
+@ Offline mode for field app | Field staff lose signal on site | Staff can work fully offline and sync later
+T Define sync rules (Product manager) ; Build local storage (Mobile dev) ; Build sync service (Backend dev) ; Field pilot (Operations lead)
+R 1 | data | Conflicting edits | Two people edit the same record offline | One person's work is overwritten | Define conflict rules and show conflicts to the user
+R 4 | quality | Sync failures go unnoticed | Errors are hidden from field staff | Data never reaches the office | Show sync status clearly and alert on failures
+R 2 | performance | Local storage fills the device | Large photos stored offline | App crashes or loses data | Compress images and limit offline storage
+X 3 | scope | Real-time collaboration offline | Request from one team | Not technically possible without a connection | -
+
+@ App accessibility overhaul | Accessibility complaints from users | App passes an accessibility audit
+T Run accessibility audit (QA) ; Fix screen reader labels (Mobile dev) ; Fix colour contrast (Designer) ; Retest with users (UX researcher)
+R 1 | scope | Audit finds more than expected | Many screens built without accessibility in mind | Fixes take longer than planned | Prioritize the most used journeys first
+R 4 | testing | No real assistive technology users involved | Testing only with automated tools | Real problems remain | Recruit users who rely on assistive technology
+R 3 | quality | Brand colours fail contrast | Brand palette was never checked | Design and brand teams disagree | Agree an accessible variant of the palette with the brand owner
+X 2 | schedule | Fix everything in one release | Wanting to close all issues quickly | Huge release that is hard to test | -
+
+@ In-app subscription launch | Business decides to add paid plans | Users can subscribe inside the app
+T Define plans and pricing (Product manager) ; Integrate store billing (Mobile dev) ; Build entitlement service (Backend dev) ; Launch campaign (Marketing lead)
+R 2 | compliance | Store billing rules broken | Linking to external payment pages | App removed from the store | Follow store billing rules and review them before launch
+R 3 | integration | Entitlements out of sync | Store notifications missed | Paying users lose access | Reconcile purchases with the store daily
+R 4 | adoption | Users react badly to paywall | Free features moved behind payment | Ratings drop | Keep existing features free and add new value to paid plans
+X 1 | budget | Offer lifetime deals to everyone | Quick revenue boost | Undermines recurring revenue | -
+
+@ Push notification redesign | Users disable notifications | Users find notifications useful and keep them on
+T Analyze notification data (Data analyst) ; Define notification rules (Product manager) ; Build preference centre (Mobile dev) ; A/B test (Growth lead)
+R 2 | adoption | Too many notifications | Each team sends its own messages | Users turn notifications off entirely | Set a shared limit on notifications per user
+R 3 | compliance | Consent not recorded | Preferences stored only on the device | Marketing messages sent without consent | Store consent on the server with timestamps
+R 4 | data | Test results misread | Test runs during a holiday period | Wrong conclusion about what works | Run tests over normal weeks and agree metrics first
+X 1 | scope | Send notifications at night for engagement | Higher open rates claimed | Annoys users and breaks consent | -
+
+@ App performance and crash fix | Crash rate rising after last release | Stable app with few crashes
+T Collect crash reports (Mobile dev) ; Fix top crashes (Mobile dev) ; Improve startup time (Mobile dev) ; Staged release (Release manager)
+R 1 | data | Crash reports incomplete | Symbols not uploaded for builds | Crashes cannot be traced to code | Upload symbols automatically in the build pipeline
+R 4 | release | Fix causes new crashes | Release goes to everyone at once | New crash affects all users | Use staged rollout and watch crash rates
+R 3 | testing | Slow devices not tested | Startup only measured on fast phones | Most users still see slow starts | Measure startup on low-end devices
+X 2 | schedule | Pause all feature work for a quarter | Frustration with crashes | Stalls the roadmap more than needed | -
+
+@ Mobile login with SSO | Enterprise customers ask for single sign-on | Enterprise users log in with company accounts
+T Choose identity protocol (Architect) ; Integrate identity provider (Mobile dev) ; Test with pilot customer (QA) ; Document setup (Technical writer)
+R 2 | security | Tokens stored insecurely | Tokens saved in plain storage | Accounts can be hijacked | Use the platform's secure storage
+R 3 | integration | Customer identity providers differ | Each customer configures things differently | Login fails for some customers | Test with several identity providers before launch
+R 4 | communication | Admins cannot configure it | Setup guide is unclear | Support tickets increase | Write a step-by-step guide with screenshots
+X 1 | security | Store passwords to log users in automatically | Make login faster | Unsafe and against security policy | -
+
+@ App localization | Expansion into new countries approved | App available in three new languages
+T Extract text strings (Mobile dev) ; Professional translation (Localization lead) ; Layout fixes (Designer) ; Market review (Country managers)
+R 1 | quality | Hard-coded text missed | Text built into images and code | Parts of the app stay untranslated | Scan the code for hard-coded text before translation
+R 3 | quality | Translated text breaks layouts | Longer words in some languages | Buttons and labels get cut off | Test layouts with long sample text early
+R 4 | approval | Legal text not reviewed locally | Terms translated without legal review | Compliance issues in new markets | Have local legal review the terms
+X 2 | budget | Use machine translation only | Lower cost | Quality too low for paying customers | -
+
+@ Health data integration | Users want to sync fitness trackers | App reads data from popular health platforms
+T Review platform rules (Product manager) ; Build integrations (Mobile dev) ; Privacy review (Privacy officer) ; Beta with users (QA)
+R 3 | compliance | Health data privacy breach | Data shared with analytics tools | Legal and reputation damage | Keep health data out of analytics and get a privacy review
+R 2 | integration | Platform permission changes | Platforms change their permission model | Sync stops working for users | Monitor platform release notes and test betas
+R 4 | data | Duplicate data entries | Same workout synced from two sources | Users see wrong totals | Deduplicate records by source and time
+X 1 | scope | Sell anonymized health data | New revenue idea | Breaks user trust and platform rules | -
+
+@ App redesign for older users | Research shows older users struggle with the app | Older users complete key tasks easily
+T User research (UX researcher) ; Redesign key journeys (Designer) ; Build changes (Mobile dev) ; Usability testing (UX researcher)
+R 1 | data | Research sample too small | Few older participants recruited | Design decisions based on weak evidence | Recruit through partner organizations
+R 2 | adoption | Existing users dislike changes | Familiar screens are moved | Complaints from current users | Release gradually and offer a short tour
+R 4 | schedule | Testing sessions hard to schedule | Participants need support to join | Testing runs late | Offer in-person sessions and phone support
+X 3 | scope | Build a separate simplified app | Easier to design from scratch | Doubles maintenance work | -
+
+## checkout
+@ Checkout redesign | Checkout change approved | New checkout live without losing conversion
+T Confirm requirements (Product owner) ; Build integration (Backend dev) ; QA and staged rollout (QA lead) ; Monitor conversion (Analyst)
+R 1 | scope | Unclear tax and discount rules | Edge cases not written down | Rework after build starts | Use a requirements checklist with tax and discount cases
+R 2 | integration | Payment API mismatch | Sandbox behaves differently from production | Payments fail after release | Contract-test against the provider and pin the API version
+R 3 | release | Release defect needs rollback | Defect appears during rollout | Customers cannot pay until rollback | Release behind a feature flag with a tested rollback
+X 4 | scope | Remove guest checkout | Want more registered users | Likely to lose buyers who do not want accounts | -
+
+@ New payment provider | Current provider fees too high | All payments processed by the new provider
+T Select provider (Finance lead) ; Integrate payments (Backend dev) ; Migrate saved cards (Payments engineer) ; Switch traffic (Tech lead)
+R 3 | security | Saved cards cannot be migrated | Card data held by the old provider | Customers must re-enter cards | Arrange a secure card transfer between providers early
+R 4 | release | Payment failures after switch | Fraud rules differ between providers | Legitimate orders declined | Switch a small share of traffic first and compare
+R 1 | vendor | Contract terms unfavourable | Hidden fees in the new contract | Savings smaller than expected | Have finance review the full fee schedule
+X 2 | security | Store card numbers ourselves | More control over payments | Huge security and compliance burden | -
+
+@ Buy now pay later option | Customers ask for instalment payments | Instalment option available at checkout
+T Choose provider (Product owner) ; Integrate option (Backend dev) ; Update terms (Legal) ; Launch and monitor (Analyst)
+R 3 | compliance | Credit rules in some regions | Instalments count as credit | Legal issues in regulated markets | Check regional rules and enable per region
+R 2 | integration | Refunds handled differently | Provider has its own refund flow | Refunds get stuck | Test refunds and partial refunds before launch
+R 4 | budget | Provider fees reduce margin | Higher fees than card payments | Profit drops on low-margin items | Limit the option to orders above a threshold
+X 1 | scope | Build our own instalment system | Avoid provider fees | Requires lending licences and risk management | -
+
+@ Checkout performance fix | Checkout pages are slow at peak times | Fast checkout during peak sales
+T Load test checkout (SRE) ; Optimize database queries (Backend dev) ; Add caching (Backend dev) ; Peak readiness review (Engineering manager)
+R 1 | testing | Load test unrealistic | Test traffic does not match real behaviour | Problems appear only on the real peak day | Base load tests on last year's peak traffic patterns
+R 3 | quality | Caching shows stale prices | Prices cached too long | Customers charged wrong prices | Never cache prices and stock without short expiry
+R 4 | communication | Teams not on call during peak | Peak falls on a holiday | Slow response to incidents | Agree an on-call rota before the peak
+X 2 | budget | Buy much bigger servers permanently | Quick fix for peak | Expensive all year for a few busy days | -
+
+@ Address validation | Many orders fail delivery due to bad addresses | Addresses checked at checkout
+T Choose address service (Product owner) ; Integrate lookup (Frontend dev) ; Handle international formats (Backend dev) ; Measure delivery failures (Analyst)
+R 3 | quality | International addresses rejected | Validation built for one country | Foreign customers cannot order | Test with addresses from every market
+R 2 | adoption | Validation annoys customers | Too strict corrections | Customers abandon checkout | Suggest corrections instead of blocking
+R 1 | vendor | Lookup service outage | Third-party service goes down | Checkout blocked entirely | Fall back to manual entry when the service fails
+X 4 | scope | Require phone verification for every order | Reduce fraud too | Adds friction for all customers | -
+
+@ Promo code system | Marketing wants flexible discount codes | Codes created and tracked by marketing
+T Define promotion rules (Marketing lead) ; Build promo engine (Backend dev) ; Admin interface (Frontend dev) ; Fraud checks (Risk analyst)
+R 4 | security | Codes shared publicly | Single-use codes leak to coupon sites | Large unplanned discounts | Limit uses per code and per customer
+R 1 | scope | Promotions stack unexpectedly | Rules for combining codes unclear | Items sold below cost | Define stacking rules and test combinations
+R 3 | quality | Marketing creates wrong codes | Admin tool lacks checks | Wrong discounts go live | Add a preview and approval step
+X 2 | scope | Allow unlimited free shipping codes | Boost conversion | Costs not controlled | -
+
+@ Order confirmation emails | Customers say confirmations arrive late | Confirmations arrive within moments of ordering
+T Review email pipeline (Backend dev) ; Switch email provider (Ops engineer) ; Update templates (Designer) ; Monitor delivery (Support lead)
+R 2 | vendor | Emails land in spam | New sending domain not configured | Customers never see confirmations | Set up email authentication records before switching
+R 3 | quality | Template breaks in some email apps | Complex layout | Order details unreadable | Test templates in common email apps
+R 4 | communication | Support not told about changes | Change made without notice | Support cannot answer questions | Brief support before switching
+X 1 | scope | Replace email with SMS only | SMS feels faster | Not all customers want SMS and it costs more | -
+
+@ Guest checkout improvement | Many shoppers abandon at account creation | Shoppers can check out without an account
+T Analyze drop-off (Analyst) ; Design guest flow (Designer) ; Build guest checkout (Frontend dev) ; Post-purchase account offer (Product owner)
+R 3 | security | Guest orders used for fraud | Fewer checks on guest orders | Chargebacks rise | Apply fraud checks to guest orders too
+R 4 | data | Duplicate customer records | Guests later create accounts | Order history split | Link guest orders to accounts by verified email
+R 1 | data | Drop-off cause misread | Analytics events missing | Wrong fix chosen | Fix analytics tracking before analysis
+X 2 | scope | Remove email field entirely | Fewer fields is faster | No way to send order confirmations | -
+
+@ Marketplace seller payouts | Platform adds third-party sellers | Sellers receive accurate payouts on schedule
+T Define payout rules (Finance lead) ; Build payout engine (Backend dev) ; Seller verification (Compliance officer) ; Pilot with sellers (Partner manager)
+R 3 | compliance | Seller identity not verified | Verification skipped to onboard faster | Money sent to fraudulent sellers | Require verification before the first payout
+R 2 | data | Payout calculation errors | Refunds and fees handled inconsistently | Sellers paid wrong amounts | Reconcile payouts against orders before release
+R 4 | communication | Sellers confused by statements | Statements hard to read | Support load increases | Test statements with pilot sellers
+X 1 | scope | Pay sellers instantly on every order | Sellers like fast money | Ignores refund risk | -
+
+@ Tax calculation service | Expansion creates complex tax rules | Correct tax charged in every market
+T Gather tax rules (Tax specialist) ; Integrate tax service (Backend dev) ; Test tax scenarios (QA) ; Go live per market (Product owner)
+R 1 | compliance | Tax rules misunderstood | Rules interpreted without an expert | Wrong tax collected | Have a tax specialist sign off test cases
+R 3 | testing | Edge cases untested | Mixed baskets and exemptions skipped | Tax errors on some orders | Build a test set of tricky baskets
+R 2 | vendor | Tax service outage | External service unavailable | Checkout cannot calculate totals | Cache rates and define a fallback behaviour
+X 4 | schedule | Launch all markets on one day | Single big launch | Too many tax regimes to verify at once | -
+
+## data
+@ Data warehouse migration | Old warehouse reaches end of support | All reports running on the new warehouse
+T Inventory reports (Data analyst) ; Migrate pipelines (Data engineer) ; Validate numbers (Finance analyst) ; Switch off old warehouse (Data platform lead)
+R 3 | data | Numbers differ after migration | Different rounding and time zones | Business loses trust in reports | Compare key reports side by side before switching
+R 1 | scope | Unused reports migrated | Nobody knows which reports matter | Effort wasted on dead reports | Check report usage and retire unused ones first
+R 4 | dependency | Hidden downstream consumers | Other teams read old tables directly | Their tools break at switch-off | Monitor access logs and notify consumers early
+X 2 | schedule | Migrate everything in one weekend | Wanting a clean cut | Too much to validate in time | -
+
+@ Customer churn model | Leadership wants to predict churn | Monthly churn risk list used by account managers
+T Define churn (Product analyst) ; Prepare training data (Data engineer) ; Build model (Data scientist) ; Roll out to account managers (Sales lead)
+R 1 | data | Churn defined inconsistently | Teams use different definitions | Model predicts the wrong thing | Agree one written definition before modelling
+R 2 | data | Data leakage in training | Future information used as input | Model looks great but fails in use | Build features only from data available at prediction time
+R 4 | adoption | Account managers ignore the list | No explanation for scores | No business impact | Show the top reasons for each score
+X 3 | scope | Use a very complex model for small gains | Chasing benchmark scores | Hard to explain and maintain | -
+
+@ Analytics tracking cleanup | Product metrics are unreliable | Trusted tracking plan in place
+T Audit events (Product analyst) ; Write tracking plan (Product manager) ; Fix implementation (Frontend dev) ; Validate dashboards (Data analyst)
+R 3 | quality | Fixes break existing dashboards | Event names change | Historical comparisons broken | Map old and new events and keep both for a transition period
+R 2 | communication | Teams keep adding untracked events | No review process | Mess returns quickly | Add tracking plan review to the release checklist
+R 1 | scope | Audit takes too long | Too many events to review | Project stalls | Focus on events used in key metrics first
+X 4 | scope | Delete all historical data and start fresh | Clean slate | Loses valuable history | -
+
+@ Data privacy deletion process | Regulators require deletion on request | Customer data deleted within the required time
+T Map personal data (Privacy officer) ; Build deletion workflow (Backend dev) ; Cover backups and logs (Data engineer) ; Audit the process (Compliance officer)
+R 1 | compliance | Personal data in unknown places | Copies in spreadsheets and exports | Deletion incomplete | Run a data discovery exercise across systems
+R 3 | data | Backups keep deleted data | Backups restored after deletion | Deleted data reappears | Re-apply deletions after any restore
+R 4 | quality | No proof of deletion | Process not logged | Cannot answer regulator questions | Log each deletion request and its completion
+X 2 | security | Keep data but hide it from users | Easier than deleting | Does not meet legal requirements | -
+
+@ Real-time dashboard | Operations want live order status | Live dashboard used in daily operations
+T Define key metrics (Operations lead) ; Build streaming pipeline (Data engineer) ; Build dashboard (BI developer) ; Train operations team (Operations lead)
+R 2 | performance | Stream lags at peak | Pipeline sized for normal load | Dashboard shows old data when it matters | Load test the pipeline at peak volumes
+R 1 | scope | Too many metrics requested | Every team wants its numbers | Dashboard becomes cluttered | Agree a small set of decision-driving metrics
+R 4 | adoption | Team keeps using spreadsheets | Dashboard does not fit their routine | Investment wasted | Design the dashboard around the daily stand-up
+X 3 | scope | Make every chart update every second | Feels more real-time | Expensive and distracting | -
+
+@ Master data cleanup | Duplicate customer records cause errors | Single clean record per customer
+T Profile data quality (Data analyst) ; Define matching rules (Data steward) ; Merge duplicates (Data engineer) ; Prevent new duplicates (Product owner)
+R 3 | data | Wrong records merged | Matching rules too loose | Customer histories mixed up | Review merges in samples before running at scale
+R 4 | quality | Duplicates return | Entry forms allow duplicates | Cleanup must be repeated | Add duplicate checks at data entry
+R 2 | approval | No agreed data owner | Teams dispute which record is correct | Decisions stall | Appoint a data steward with authority
+X 1 | scope | Buy an expensive master data platform first | Tool will solve it | Process problems remain | -
+
+@ Machine learning model deployment | Model performs well in notebooks | Model serving predictions in production
+T Package model (Data scientist) ; Build serving API (ML engineer) ; Monitoring and alerts (ML engineer) ; Gradual rollout (Product manager)
+R 3 | quality | Model drift unnoticed | Input data changes over time | Predictions quietly get worse | Monitor input distributions and prediction quality
+R 2 | performance | Predictions too slow | Model too large for real-time use | Product feature feels laggy | Measure latency early and simplify if needed
+R 1 | dependency | Training and serving code differ | Features computed differently | Predictions do not match tests | Share feature code between training and serving
+X 4 | release | Replace the old logic everywhere at once | Confidence in test results | No safe way to compare in production | -
+
+@ Data catalogue rollout | Analysts cannot find trusted datasets | Analysts find documented datasets quickly
+T Choose catalogue tool (Data platform lead) ; Document key datasets (Data stewards) ; Integrate with warehouse (Data engineer) ; Promote to analysts (Analytics lead)
+R 2 | staffing | Documentation never finished | Stewards have no time allocated | Catalogue stays empty | Allocate steward time and start with top datasets
+R 4 | adoption | Analysts do not use it | Old habits of asking colleagues | Tool unused | Link the catalogue from dashboards and onboarding
+R 3 | integration | Metadata goes stale | No automatic sync with the warehouse | Wrong information shown | Sync technical metadata automatically
+X 1 | budget | Build our own catalogue | Avoid licence costs | Large build effort for a solved problem | -
+
+@ Survey analysis project | Customer survey results arrived | Findings presented to leadership
+T Clean survey data (Data analyst) ; Analyze responses (Researcher) ; Build charts (Data analyst) ; Present findings (Research lead)
+R 1 | data | Low response quality | Many incomplete or rushed answers | Conclusions unreliable | Filter low-quality responses with clear rules
+R 2 | quality | Over-interpreting small groups | Segments with few responses | Misleading findings | Report sample sizes and avoid tiny segments
+R 4 | communication | Leadership wants simple answers | Nuance lost in summary | Wrong decisions made | Lead with key findings and state limitations clearly
+X 3 | quality | Remove responses that disagree with expectations | Cleaner story | Biases the results | -
+
+@ Reporting automation | Monthly reports built by hand | Reports generated automatically each month
+T Document manual steps (Analyst) ; Build automated pipeline (Data engineer) ; Validate outputs (Finance analyst) ; Retire manual process (Team lead)
+R 1 | scope | Manual steps hide judgement calls | Analysts adjust numbers by hand | Automation cannot replicate them | Capture each adjustment rule explicitly
+R 3 | data | Automated report differs | Source data timing differs | Users distrust the new report | Run manual and automated reports in parallel for a cycle
+R 4 | staffing | Analyst knowledge lost | Analyst moves to another team | Nobody understands the pipeline | Document the pipeline and pair with a second person
+X 2 | scope | Automate every report at once | Faster savings | Too many reports to validate | -
+
+## infrastructure
+@ Cloud migration of web app | Data centre contract ending | Web app running in the cloud
+T Assess applications (Cloud architect) ; Set up cloud environment (DevOps engineer) ; Migrate and test (Developer) ; Cut over DNS (Ops engineer)
+R 1 | dependency | Hidden dependencies on old servers | Apps call internal services by IP | Apps break after migration | Map network traffic before migrating
+R 4 | release | DNS cut-over problems | Long DNS cache times | Users reach the old site for hours | Lower DNS cache times days before cut-over
+R 2 | budget | Cloud costs higher than planned | Servers sized like on-premises | Monthly bill exceeds budget | Right-size resources and set budget alerts
+X 3 | scope | Redesign everything to be cloud-native first | Best practice | Delays the exit beyond the contract end | -
+
+@ Backup and disaster recovery | Audit finds no tested recovery plan | Systems recoverable within agreed time
+T Define recovery targets (IT manager) ; Configure backups (Ops engineer) ; Run recovery drill (SRE) ; Document runbook (Ops engineer)
+R 3 | testing | Backups cannot be restored | Restores never tested | Data lost in a real incident | Run restore drills on a schedule
+R 2 | security | Backups encrypted with lost keys | Key management unclear | Backups unusable | Store keys in a managed vault with access controls
+R 4 | staffing | Runbook depends on one person | Knowledge not shared | Recovery slow when they are away | Train a second person and rehearse
+X 1 | budget | Replicate everything to a second region live | Maximum safety | Cost far beyond the requirement | -
+
+@ Kubernetes adoption | Deployments are manual and inconsistent | Services deployed through a standard platform
+T Design platform (Platform engineer) ; Migrate first service (Developer) ; Set up monitoring (SRE) ; Train teams (Platform lead)
+R 4 | staffing | Teams lack platform skills | Steep learning curve | Slow adoption and mistakes | Provide templates and pair with each team
+R 1 | security | Insecure default configurations | Defaults allow broad access | Security exposure | Apply security policies from day one
+R 2 | scope | Migrating complex services first | Picking the most important service | Early failure discourages teams | Start with a simple service
+X 3 | scope | Build a custom platform from scratch | Full control | Huge maintenance burden | -
+
+@ Monitoring and alerting overhaul | Incidents found by customers first | Problems detected before customers notice
+T Define service objectives (SRE) ; Instrument services (Developer) ; Tune alerts (SRE) ; On-call training (Engineering manager)
+R 3 | quality | Alert fatigue | Too many noisy alerts | Real alerts ignored | Alert only on user-facing symptoms
+R 1 | approval | No agreed service objectives | Business and engineering disagree | Alerts lack meaning | Agree objectives with product owners
+R 4 | staffing | On-call burnout | Small team covers everything | People leave | Share the rota and limit after-hours pages
+X 2 | scope | Collect every possible metric | More data is better | Cost and noise rise | -
+
+@ Network upgrade at office | Office network unreliable | Stable network for all staff
+T Survey current network (Network engineer) ; Order equipment (IT manager) ; Install over a weekend (Network engineer) ; Verify with staff (IT support)
+R 2 | logistics | Equipment delivery delayed | Supply shortages | Installation postponed | Order early and confirm delivery dates
+R 3 | schedule | Weekend work overruns | Unexpected cabling problems | Staff without network on Monday | Plan a rollback to the old setup
+R 4 | communication | Staff not told about changes | Wi-Fi names and passwords change | Help desk overwhelmed | Send instructions before Monday
+X 1 | budget | Replace every cable in the building | Future-proofing | Not needed to fix current issues | -
+
+@ Database version upgrade | Database version reaching end of life | Production database on a supported version
+T Test upgrade on a copy (DBA) ; Fix incompatible queries (Developer) ; Plan maintenance window (Ops manager) ; Upgrade production (DBA)
+R 1 | testing | Copy differs from production | Test data much smaller | Upgrade slower than expected | Test on a full-size copy and time it
+R 2 | quality | Query plans change | Optimizer behaves differently | Some pages become slow | Compare slow query logs before and after
+R 4 | release | No rollback after upgrade | Upgrade is one-way | Extended outage if it fails | Take a verified backup and rehearse the restore
+X 3 | schedule | Upgrade during business hours | Avoid weekend work | Risks outage for customers | -
+
+@ Single sign-on for internal apps | Staff juggle many passwords | Staff log in once for all internal tools
+T Choose identity provider (IT manager) ; Connect applications (Systems engineer) ; Enable multi-factor login (Security engineer) ; Retire old accounts (IT support)
+R 2 | integration | Old apps do not support SSO | Legacy software lacks modern login | Some tools left out | Use a gateway or plan replacement for those apps
+R 3 | adoption | Staff locked out by new login | Phones not set up for multi-factor | Lost working time | Run setup sessions before enforcement
+R 4 | security | Orphaned accounts remain | Old local accounts not removed | Former staff keep access | Audit and remove local accounts
+X 1 | security | Share one admin account for convenience | Faster setup | Unsafe and untraceable | -
+
+@ Cost optimization of cloud bill | Cloud bill keeps growing | Lower monthly bill without losing performance
+T Analyze spending (FinOps analyst) ; Remove unused resources (DevOps engineer) ; Right-size services (DevOps engineer) ; Set budgets and alerts (Engineering manager)
+R 2 | quality | Deleting resources still in use | Unclear ownership | Outage caused by cleanup | Tag owners and confirm before deleting
+R 3 | performance | Downsizing hurts performance | Usage peaks underestimated | Slow service at busy times | Monitor after each change and scale back if needed
+R 4 | communication | Teams ignore budgets | No consequences or visibility | Costs creep back | Share monthly cost reports per team
+X 1 | scope | Move to a different cloud to save money | Lower list prices | Migration cost outweighs savings | -
+
+@ Infrastructure as code adoption | Servers configured by hand | All infrastructure defined in code
+T Choose tooling (Platform lead) ; Import existing resources (DevOps engineer) ; Set up review pipeline (DevOps engineer) ; Train teams (Platform lead)
+R 2 | quality | Code and reality drift | Manual changes continue | Deployments overwrite manual fixes | Block manual changes and detect drift
+R 3 | security | Secrets stored in code | Credentials committed to the repository | Credential leak | Use a secrets manager and scan commits
+R 4 | adoption | Teams bypass the process | Process feels slow | Inconsistent infrastructure | Keep reviews quick and provide templates
+X 1 | scope | Rewrite all infrastructure from scratch | Clean design | Risky and slow | -
+
+@ Edge caching for global users | Overseas users report slow pages | Fast pages for users worldwide
+T Choose caching provider (Architect) ; Configure caching rules (DevOps engineer) ; Test from regions (QA) ; Go live (Ops engineer)
+R 2 | quality | Personal pages cached | Cache rules too broad | Users see other users' data | Never cache personalised pages and test carefully
+R 4 | release | Cache purge failures | Old content stays after updates | Users see outdated information | Automate purges on deploy
+R 3 | testing | Testing only from one country | No regional test points | Problems missed | Use regional test locations
+X 1 | scope | Build our own global network | Full control | Massive cost | -
+
+## marketing
+@ Product launch campaign | New product ready for market | Launch campaign reaches target customers
+T Define messaging (Product marketer) ; Create content (Content writer) ; Plan media (Marketing manager) ; Launch and measure (Marketing analyst)
+R 1 | approval | Messaging approval delays | Legal and leadership review late | Campaign launches late | Book review slots early in the plan
+R 2 | schedule | Content production overruns | Too many asset versions | Assets missing at launch | Limit formats and prioritise key channels
+R 4 | data | Results cannot be measured | Tracking links not set up | Budget decisions made blind | Set up tracking before launch
+X 3 | budget | Spend the whole budget on the first day | Big splash | No budget left to optimise | -
+
+@ Brand refresh | Brand feels outdated | New brand applied across all channels
+T Brand research (Brand manager) ; Design new identity (Design agency) ; Update assets and website (Designer) ; Internal rollout (Marketing manager)
+R 2 | approval | Too many decision makers | Every leader wants input | Endless revisions | Define a small decision group
+R 3 | scope | Old assets missed | Assets spread across many places | Inconsistent brand | Inventory all assets before updating
+R 4 | adoption | Staff keep old templates | New templates not easy to find | Mixed brand use | Share templates in one place and remove old ones
+X 1 | budget | Run a nationwide TV campaign for the new logo | Visibility | Cost not justified by goals | -
+
+@ Email newsletter relaunch | Newsletter engagement falling | Engaged subscribers reading each issue
+T Clean subscriber list (Email marketer) ; Redesign template (Designer) ; Plan content calendar (Content lead) ; Test and send (Email marketer)
+R 1 | compliance | Consent records missing | Old subscribers added without consent | Legal issues and spam complaints | Re-confirm consent for old subscribers
+R 4 | quality | Emails flagged as spam | Sudden changes in sending | Low delivery | Warm up sending gradually
+R 3 | staffing | Content calendar slips | Writers busy with other work | Irregular issues | Prepare a buffer of ready content
+X 2 | scope | Send daily instead of weekly | More touch points | Likely to increase unsubscribes | -
+
+@ Social media campaign | Need to grow social following | Campaign increases engaged followers
+T Define audience and goals (Social media manager) ; Create posts (Content creator) ; Partner with creators (Partnerships lead) ; Monitor and respond (Community manager)
+R 3 | compliance | Creator posts not disclosed | Paid posts not labelled | Regulatory issues | Require clear disclosure in creator contracts
+R 4 | communication | Negative comments unanswered | No moderation plan | Reputation damage | Prepare response guidelines and coverage
+R 2 | quality | Off-brand posts | Content rushed | Confusing message | Review posts against brand guidelines
+X 1 | budget | Buy followers to look popular | Quick growth | Fake engagement and platform penalties | -
+
+@ Website content migration | New website platform chosen | All content moved to the new site
+T Content audit (Content lead) ; Migrate pages (Web editor) ; Set up redirects (Web developer) ; Search ranking check (SEO specialist)
+R 3 | quality | Search rankings drop | Redirects missing | Traffic falls | Map every old URL to a new one
+R 1 | scope | Too much outdated content | Old pages never reviewed | Migration takes longer | Archive outdated pages instead of migrating
+R 2 | staffing | Editors not trained | New platform unfamiliar | Errors in pages | Train editors before migration
+X 4 | scope | Change all URLs to a new structure for style | Cleaner URLs | Hurts search rankings | -
+
+@ Webinar series | Want to generate qualified leads | Monthly webinars producing leads
+T Pick topics and speakers (Marketing manager) ; Set up platform (Marketing ops) ; Promote webinars (Campaign manager) ; Follow up leads (Sales development)
+R 1 | dependency | Speakers cancel | Speakers busy with client work | Webinar postponed | Have a backup speaker for each session
+R 2 | quality | Platform technical issues | Untested setup | Poor attendee experience | Run a full rehearsal
+R 4 | communication | Leads not followed up | Sales not involved early | Leads go cold | Agree follow-up process with sales
+X 3 | budget | Pay for large ad campaigns for each webinar | More sign-ups | Cost per lead too high | -
+
+@ Customer case study program | Sales needs proof from real customers | Library of approved case studies
+T Identify customers (Customer success manager) ; Interview customers (Content writer) ; Legal approval (Legal) ; Publish and share (Marketing manager)
+R 3 | approval | Customer legal approval slow | Customers need internal approval | Case studies delayed | Start approvals early and offer anonymised versions
+R 1 | staffing | Customers too busy | Interviews hard to schedule | Few case studies | Keep interviews short and flexible
+R 4 | adoption | Sales does not use them | Hard to find | Effort wasted | Put case studies in the sales toolkit
+X 2 | quality | Invent results to make stories stronger | Better marketing | Dishonest and risky | -
+
+@ Event sponsorship | Industry event offers sponsorship | Sponsorship generates useful contacts
+T Negotiate package (Marketing manager) ; Design booth (Designer) ; Staff the booth (Sales team) ; Follow up contacts (Sales development)
+R 2 | logistics | Booth materials arrive late | Shipping delays | Empty booth on day one | Ship early and pack essentials in luggage
+R 3 | staffing | Booth understaffed | Sales team double-booked | Missed conversations | Agree a staffing rota early
+R 4 | data | Contacts lost | Paper lead forms | No follow-up | Use digital lead capture
+X 1 | budget | Sponsor every event this year | More visibility | Spreads budget too thin | -
+
+@ Marketing automation setup | Leads handled manually | Leads nurtured automatically
+T Choose platform (Marketing ops) ; Map lead journeys (Marketing manager) ; Integrate with CRM (CRM admin) ; Launch nurture flows (Email marketer)
+R 3 | integration | CRM sync errors | Field mismatches | Wrong data in both systems | Map fields carefully and test with sample leads
+R 2 | scope | Journeys too complex | Every scenario mapped | Hard to maintain | Start with a few simple journeys
+R 4 | compliance | Messages sent without consent | Imported contacts lack consent | Complaints and legal risk | Check consent before adding to flows
+X 1 | budget | Buy the most expensive platform tier | More features | Features not needed yet | -
+
+@ Rebrand of product name | Product name confuses customers | New name adopted by customers
+T Research name options (Brand manager) ; Trademark check (Legal) ; Update product and website (Product team) ; Announce change (Communications lead)
+R 2 | compliance | Name already trademarked | Search not thorough | Forced to rename again | Do a full trademark search in key markets
+R 3 | scope | Old name remains in places | Many references in docs and code | Confusing experience | List every place the name appears
+R 4 | communication | Customers confused by change | Change not explained | Support tickets rise | Explain the change and keep the old name visible for a while
+X 1 | quality | Choose a name without checking meaning in other languages | Faster decision | Possible embarrassing meanings | -
+
+## events
+@ Annual company conference | Leadership approves annual conference | Successful conference for all staff
+T Book venue (Event manager) ; Plan agenda (Communications lead) ; Arrange travel (Travel coordinator) ; Run the event (Event manager)
+R 1 | logistics | Venue unavailable | Popular dates booked early | Event moved or downgraded | Book the venue months in advance
+R 3 | budget | Travel costs overrun | Late bookings | Budget exceeded | Set a booking deadline and travel policy
+R 4 | logistics | Technical failures on stage | Audio and video not tested | Poor experience | Run a technical rehearsal
+X 2 | scope | Add an overnight party on a boat | Memorable experience | Safety and cost concerns | -
+
+@ Community meetup series | Want to build a local user community | Regular well-attended meetups
+T Find venues (Community manager) ; Recruit speakers (Community manager) ; Promote meetups (Marketing coordinator) ; Host events (Community volunteers)
+R 2 | dependency | Not enough speakers | Same people asked every time | Meetups cancelled | Build a speaker pipeline and invite members to talk
+R 3 | adoption | Low attendance | Poor promotion timing | Unhappy hosts | Promote early and send reminders
+R 4 | staffing | Volunteers burn out | Same few people do everything | Series stops | Rotate roles and thank volunteers
+X 1 | budget | Pay famous speakers for every meetup | Attract crowds | Not sustainable | -
+
+@ Product launch event | Product ready to announce | Launch event creates press coverage
+T Choose format and venue (Event manager) ; Prepare demos (Product team) ; Invite press (PR manager) ; Run the event (Event manager)
+R 2 | quality | Live demo fails | Demo depends on network and live data | Embarrassing launch | Prepare a recorded backup demo
+R 3 | schedule | Press date clashes | Bigger news on the same day | Little coverage | Check industry calendars before setting the date
+R 1 | budget | Venue costs rise | Extra services added late | Budget exceeded | Agree a fixed package price
+X 4 | scope | Reveal unfinished features | More excitement | Promises that cannot be kept | -
+
+@ Charity fundraising gala | Charity board approves a gala | Gala raises funds for the cause
+T Secure venue and catering (Event planner) ; Find sponsors (Fundraising lead) ; Sell tickets (Marketing volunteer) ; Run auction (Auction coordinator)
+R 2 | budget | Sponsors pull out | Economic conditions change | Funding gap | Confirm sponsorships in writing early
+R 3 | adoption | Ticket sales slow | Weak promotion | Low attendance | Use early-bird pricing and personal invitations
+R 4 | compliance | Auction rules not followed | Local gambling and tax rules | Legal issues | Check local rules for auctions and raffles
+X 1 | budget | Book a celebrity performer with no sponsor | Draw a crowd | Cost could exceed funds raised | -
+
+@ Team offsite | Team needs planning time together | Productive two-day offsite
+T Pick location (Team lead) ; Plan agenda (Facilitator) ; Book travel (Office manager) ; Follow up actions (Team lead)
+R 2 | scope | Agenda too packed | Too many topics | No real decisions made | Limit the agenda to key decisions
+R 3 | logistics | Travel disruptions | Bad weather or strikes | People arrive late | Choose a location reachable by several routes
+R 4 | communication | Actions forgotten | No follow-up owner | Offsite has no impact | Assign owners and review actions after two weeks
+X 1 | budget | Fly the team abroad | Fun experience | Cost and time not justified | -
+
+@ Trade show booth | Company exhibits at a major trade show | Booth generates qualified leads
+T Book stand space (Event manager) ; Build booth (Exhibition contractor) ; Train booth staff (Sales manager) ; Capture leads (Marketing ops)
+R 2 | vendor | Contractor delivers late | Contractor overbooked | Booth not ready | Choose contractors with references and set milestones
+R 3 | quality | Staff unprepared | No product training | Weak conversations | Run a short training and give talking points
+R 4 | data | Lead data low quality | Badge scans without notes | Poor follow-up | Add qualifying questions to lead capture
+X 1 | budget | Build the biggest booth at the show | Stand out | Cost far above expected return | -
+
+@ Hackathon event | Company wants innovation ideas | Hackathon delivers prototypes
+T Define themes and rules (Organizer) ; Recruit teams (Organizer) ; Provide tools and data (Platform team) ; Judge and follow up (Judging panel)
+R 3 | dependency | Tools not ready on the day | Accounts and data access delayed | Teams waste time | Prepare accounts and sample data in advance
+R 2 | adoption | Few participants | Clashes with deadlines | Low energy | Schedule after major deadlines and get manager support
+R 4 | communication | Winning ideas abandoned | No follow-up plan | Participants lose motivation | Commit to supporting winning ideas
+X 1 | scope | Allow access to real customer data | More realistic prototypes | Privacy risk | -
+
+@ Wedding planning | Couple engaged and setting a date | Wedding day runs smoothly
+T Set budget (Couple) ; Book venue (Couple) ; Book vendors (Wedding planner) ; Coordinate the day (Wedding planner)
+R 2 | logistics | Venue double-booked | No written contract | Venue lost | Get a signed contract and deposit receipt
+R 3 | vendor | Vendor cancels last minute | Vendor illness or overbooking | Missing service on the day | Keep a backup list of vendors
+R 1 | budget | Budget creep | Many small upgrades | Debt after the wedding | Track spending against the budget weekly
+X 4 | scope | Invite everyone you know | Avoid offending anyone | Cost and venue size problems | -
+
+@ Workshop for new product users | Customers struggle with a new feature | Customers use the feature confidently
+T Design workshop content (Trainer) ; Schedule sessions (Customer success) ; Run workshops (Trainer) ; Collect feedback (Customer success)
+R 1 | quality | Content too technical | Written by engineers | Customers lost | Test content with a few customers first
+R 2 | schedule | Time zones exclude customers | Single session time | Some regions miss out | Offer sessions in several time zones and record them
+R 4 | data | Feedback not used | No owner for improvements | Same issues repeat | Assign an owner to act on feedback
+X 3 | scope | Make workshops mandatory | Ensure attendance | Annoys customers | -
+
+@ Sports tournament organization | Club agrees to host a tournament | Tournament completed safely on schedule
+T Book fields (Club secretary) ; Register teams (Tournament organizer) ; Arrange referees (Referee coordinator) ; Run match days (Organizing committee)
+R 3 | staffing | Not enough referees | Referees unavailable | Matches delayed | Recruit referees early and keep reserves
+R 4 | logistics | Bad weather | Outdoor fields | Matches cancelled | Plan backup dates or indoor options
+R 1 | compliance | Safety and insurance gaps | Permits not checked | Event cancelled or liability issues | Confirm insurance and permits early
+X 2 | scope | Accept unlimited teams | More fees | Schedule impossible to fit | -
+
+## hiring
+@ Hire a senior engineer | Budget approved for a senior engineer | New engineer productive in the team
+T Write job description (Hiring manager) ; Source candidates (Recruiter) ; Interview loop (Interview panel) ; Onboard new hire (Team lead)
+R 2 | schedule | Small candidate pool | Niche skills required | Role open for months | Widen the search to remote candidates
+R 3 | quality | Inconsistent interviews | No shared criteria | Wrong hire | Use a structured scorecard
+R 4 | staffing | New hire leaves early | Poor onboarding | Hiring repeated | Assign a buddy and a first-month plan
+X 1 | scope | Require ten years in a new framework | Find the best expert | Impossible requirement | -
+
+@ Graduate hiring program | Company wants to grow junior talent | Cohort of graduates hired and trained
+T Partner with universities (Talent lead) ; Run assessment days (Recruiter) ; Design training plan (Learning manager) ; Assign mentors (Engineering manager)
+R 1 | dependency | University calendar mismatch | Recruiting season missed | Few applicants | Plan around university career fairs
+R 4 | staffing | Mentors overloaded | Mentors also deliver projects | Graduates unsupported | Reduce mentors' workload
+R 3 | quality | Training too generic | One plan for all roles | Slow development | Tailor training by role
+X 2 | quality | Hire only from a few elite universities | Prestige | Narrows talent and diversity | -
+
+@ Remote onboarding process | Company goes remote-first | New hires onboard smoothly remotely
+T Ship equipment (IT support) ; Prepare accounts (IT support) ; Plan first weeks (Hiring manager) ; Check in regularly (HR partner)
+R 1 | logistics | Laptop arrives late | Shipping delays | New hire cannot work on day one | Ship equipment a week before the start date
+R 2 | security | Account access missing | Permissions requested late | Lost days | Use a role-based access checklist
+R 4 | communication | New hire feels isolated | Few informal contacts | Early departure | Schedule regular social check-ins
+X 3 | scope | Require all new hires to relocate | Easier onboarding | Contradicts remote-first goal | -
+
+@ Diversity in hiring initiative | Leadership commits to fairer hiring | More diverse candidate pipeline
+T Review job ads (Recruiter) ; Train interviewers (HR partner) ; Diversify sourcing (Talent lead) ; Track progress (People analyst)
+R 2 | quality | Training seen as a box-tick | Short one-off session | Behaviour unchanged | Use practical training and follow-up
+R 3 | dependency | Sourcing channels limited | Few partner organizations | Pipeline unchanged | Build long-term partnerships
+R 4 | compliance | Sensitive data handled badly | Demographic data stored loosely | Privacy breach | Collect data voluntarily and store it securely
+X 1 | compliance | Set rigid quotas for each role | Fast results | Legal risk and unfair outcomes | -
+
+@ Seasonal staff hiring | Busy season approaching | Seasonal staff hired and trained in time
+T Plan headcount (Operations manager) ; Advertise roles (Recruiter) ; Run group interviews (Store managers) ; Train new staff (Trainers)
+R 2 | schedule | Hiring starts too late | Planning delayed | Understaffed in peak | Start hiring early with a timeline
+R 4 | quality | Training rushed | Staff start right away | Mistakes with customers | Use short focused training and shadowing
+R 3 | adoption | Candidates do not show up | Many applications but low commitment | Gaps on day one | Over-hire slightly and confirm start dates
+X 1 | budget | Pay double wages to attract staff | Fill roles quickly | Unsustainable cost | -
+
+@ HR system implementation | Paper-based HR processes | Employees manage records in an HR system
+T Select system (HR director) ; Migrate employee data (HR analyst) ; Configure workflows (HR systems admin) ; Train staff (HR partners)
+R 2 | data | Employee data errors | Old records inconsistent | Wrong payroll data | Clean data and verify with employees
+R 3 | scope | Too much customization | Recreating old paper forms | Delays and cost | Adapt processes to standard features where possible
+R 4 | adoption | Managers avoid the system | Unfamiliar tool | Processes stay manual | Train managers with real tasks
+X 1 | budget | Build a custom HR system | Exact fit | High cost and maintenance | -
+
+@ Internship program | Company starts a summer internship | Interns complete meaningful projects
+T Define projects (Team leads) ; Recruit interns (Recruiter) ; Assign supervisors (Engineering manager) ; Final presentations (Program coordinator)
+R 1 | scope | Projects too vague | Teams unsure what to give interns | Interns idle | Define projects with clear outcomes
+R 3 | staffing | Supervisors unavailable | Busy with deadlines | Interns unsupported | Give supervisors protected time
+R 2 | compliance | Visa and pay rules | International interns | Legal issues | Check work rules early
+X 4 | scope | Give interns production access without review | Real experience | Security and quality risks | -
+
+@ Leadership training program | Managers lack people skills | Managers lead teams confidently
+T Assess needs (Learning manager) ; Choose training provider (HR director) ; Run sessions (Training provider) ; Measure impact (People analyst)
+R 2 | vendor | Provider content generic | Off-the-shelf course | Low relevance | Customize with real company scenarios
+R 3 | schedule | Managers skip sessions | Workload pressure | Low completion | Schedule with leadership support
+R 4 | data | Impact not measurable | No baseline | Program value unclear | Survey teams before and after
+X 1 | budget | Send everyone to expensive executive programs | Prestige | Cost far above value | -
+
+@ Employee engagement survey | Engagement concerns raised | Action plan based on survey results
+T Design survey (People analyst) ; Run survey (HR partner) ; Analyze results (People analyst) ; Share and act (Leadership team)
+R 2 | compliance | Anonymity concerns | Small teams identifiable | Honest answers withheld | Only report groups above a minimum size
+R 4 | adoption | No action after survey | Results not followed up | Lower trust next year | Commit to visible actions
+R 3 | quality | Results misinterpreted | Comparing teams unfairly | Wrong conclusions | Explain context and limitations
+X 1 | scope | Ask many open questions | Rich feedback | Low completion and hard analysis | -
+
+@ Contractor management | Many contractors with unclear terms | Contractors managed with clear terms
+T Inventory contractors (Procurement lead) ; Standardize contracts (Legal) ; Set up approvals (Finance) ; Review performance (Managers)
+R 2 | compliance | Misclassification risk | Contractors work like employees | Legal and tax issues | Review roles with legal
+R 3 | approval | Invoices approved without checks | No approval workflow | Overpayment | Require manager approval of hours
+R 4 | quality | Poor performance unnoticed | No reviews | Low quality work | Set deliverables and review regularly
+X 1 | budget | Convert all contractors to employees immediately | Simpler | Budget and need not assessed | -
+
+## security
+@ Security compliance audit | Customer requires a security certification | Certification achieved
+T Gap assessment (Security lead) ; Write policies (Compliance officer) ; Implement controls (IT team) ; External audit (Auditor)
+R 1 | scope | Gaps larger than expected | Controls never documented | Timeline slips | Prioritise controls that the audit covers first
+R 3 | staffing | Control owners too busy | Security work added to day jobs | Controls incomplete | Assign owners with dedicated time
+R 4 | quality | Evidence missing during audit | Logs and records not kept | Audit findings | Collect evidence continuously
+X 2 | quality | Copy policies from the internet | Faster | Policies do not match practice | -
+
+@ Phishing awareness program | Staff fall for phishing emails | Staff report suspicious emails quickly
+T Baseline phishing test (Security analyst) ; Training modules (Security trainer) ; Reporting button (IT team) ; Follow-up tests (Security analyst)
+R 2 | adoption | Training ignored | Long boring modules | No change in behaviour | Use short practical lessons
+R 4 | communication | Tests cause anger | Staff feel tricked | Distrust of security team | Explain the program and avoid blame
+R 3 | quality | Reports not handled | No triage process | Staff stop reporting | Respond to every report quickly
+X 1 | quality | Name and shame staff who click | Deterrence | Discourages reporting | -
+
+@ Penetration test remediation | Penetration test found vulnerabilities | Critical vulnerabilities fixed
+T Triage findings (Security lead) ; Fix vulnerabilities (Developers) ; Retest fixes (Pentester) ; Report to leadership (Security lead)
+R 1 | quality | Findings misprioritised | Severity judged without context | Important issues left | Rate findings by real exposure
+R 2 | staffing | Fixes compete with features | Developers busy | Fixes delayed | Reserve sprint capacity for fixes
+R 3 | testing | Fixes incomplete | Root cause not addressed | Issue reappears | Retest and check for similar issues
+X 4 | communication | Hide findings from leadership | Avoid embarrassment | Prevents informed decisions | -
+
+@ Password manager rollout | Staff reuse weak passwords | Staff use a company password manager
+T Choose password manager (IT manager) ; Pilot with one team (IT support) ; Company rollout (IT support) ; Remove shared spreadsheets (Security analyst)
+R 3 | adoption | Staff keep old habits | Habit and convenience | Weak passwords remain | Run hands-on setup sessions
+R 2 | security | Master password lost | No recovery process | Locked out of accounts | Set up secure recovery options
+R 4 | data | Shared credentials not migrated | Spreadsheets forgotten | Sensitive data remains exposed | Search for and remove credential files
+X 1 | security | Allow writing passwords on paper | Easier for staff | Insecure | -
+
+@ Data loss prevention | Sensitive data shared by email | Sensitive data protected from leaks
+T Classify data (Data protection officer) ; Configure rules (Security engineer) ; Pilot and tune (Security analyst) ; Train staff (Security trainer)
+R 3 | quality | Too many false alarms | Rules too strict | Work blocked | Pilot in monitoring mode first
+R 1 | scope | Data classification unclear | No agreed categories | Rules miss sensitive data | Agree simple categories with examples
+R 4 | adoption | Staff find workarounds | Personal email used | New leaks | Explain why and provide safe alternatives
+X 2 | security | Block all attachments | Total protection | Business stops working | -
+
+@ Incident response plan | No plan for security incidents | Tested incident response plan in place
+T Define roles (Security lead) ; Write playbooks (Security analyst) ; Run tabletop exercise (Security lead) ; Update plan (Compliance officer)
+R 1 | communication | Unclear decision authority | Roles not agreed | Slow response | Name decision makers and backups
+R 3 | testing | Exercise too easy | Scenario not realistic | False confidence | Use realistic scenarios from recent incidents
+R 4 | quality | Plan not updated | Lessons not captured | Same mistakes repeated | Review the plan after each exercise
+X 2 | scope | Write playbooks for every possible attack | Complete coverage | Never finished | -
+
+@ Third-party vendor risk review | Many vendors handle company data | Vendors assessed and monitored
+T List vendors (Procurement lead) ; Send questionnaires (Security analyst) ; Review answers (Security lead) ; Contract updates (Legal)
+R 2 | vendor | Vendors do not respond | Questionnaires too long | Assessments delayed | Use short tiered questionnaires
+R 1 | scope | Unknown vendors | Teams buy tools independently | Data exposed to unreviewed vendors | Check expense reports for tools
+R 4 | approval | Contracts lack security clauses | Old contracts | Weak protections | Add clauses at renewal
+X 3 | security | Accept all answers without evidence | Faster process | False assurance | -
+
+@ Multi-factor authentication rollout | Accounts protected only by passwords | All staff use multi-factor login
+T Choose method (Security engineer) ; Enroll staff (IT support) ; Enforce for all apps (Security engineer) ; Handle exceptions (IT support)
+R 2 | adoption | Staff resist enrollment | Seen as inconvenient | Delays enforcement | Explain the benefits and offer easy methods
+R 4 | logistics | Lost phones lock people out | No backup method | Lost working time | Provide backup codes and a quick reset process
+R 3 | integration | Legacy apps lack support | Old systems | Gaps in protection | Put legacy apps behind a protected gateway
+X 1 | security | Use text messages as the only method | Easy for everyone | Weaker than app-based methods | -
+
+@ Secure software development training | Developers introduce security bugs | Fewer security bugs in new code
+T Assess current skills (Security lead) ; Deliver training (Security trainer) ; Add security checks to pipeline (DevOps engineer) ; Track findings (Security analyst)
+R 3 | adoption | Pipeline checks too noisy | Many false positives | Developers ignore results | Tune rules before enforcing
+R 2 | quality | Training too generic | Not about our stack | Little impact | Use examples from our own code
+R 4 | data | No measure of progress | Findings not tracked | Value unclear | Track findings over time
+X 1 | schedule | Stop all development for training | Fast upskilling | Business disruption | -
+
+@ Privacy policy update | New privacy law takes effect | Policy and practices meet the new law
+T Review law changes (Privacy officer) ; Update policy text (Legal) ; Change consent flows (Product team) ; Notify users (Communications lead)
+R 1 | compliance | Requirements misunderstood | Complex legal text | Non-compliance | Get specialist legal review
+R 3 | schedule | Product changes late | Competing priorities | Deadline missed | Plan product work early
+R 4 | communication | Users confused by notice | Legal language | Complaints | Write a plain-language summary
+X 2 | compliance | Copy a competitor's policy | Saves time | Does not match our practices | -
+
+## academic
+@ Final year capstone project | Team formed and topic approved | Working prototype and report submitted
+T Define requirements (Team lead) ; Build prototype (Developers) ; User testing (Tester) ; Write report and present (Whole team)
+R 1 | scope | Scope too ambitious | Excitement at the start | Unfinished prototype | Agree a minimum version and stretch goals
+R 2 | staffing | Uneven team contribution | Members busy with other courses | Work falls on one person | Agree roles and weekly check-ins
+R 4 | schedule | Report written last minute | Coding takes all the time | Weak report | Write the report alongside development
+X 3 | scope | Switch technology halfway through | New tool seems better | Wastes weeks of work | -
+
+@ Research thesis | Thesis topic approved by supervisor | Thesis submitted and defended
+T Literature review (Student) ; Collect data (Student) ; Analyze results (Student) ; Write and defend (Student)
+R 2 | data | Data collection delayed | Ethics approval or access slow | Timeline slips | Apply for approvals early
+R 1 | scope | Literature review never ends | Always more papers | No time for research | Set a time box for the review
+R 4 | communication | Supervisor feedback late | Supervisor busy | Rushed revisions | Agree feedback deadlines in advance
+X 3 | data | Remove inconvenient data points | Cleaner results | Research misconduct | -
+
+@ Hackathon project | Team registered for a hackathon | Working demo presented to judges
+T Pick idea (Team) ; Build core feature (Developers) ; Design demo (Designer) ; Pitch to judges (Presenter)
+R 2 | scope | Too many features | Trying to impress | Nothing works fully | Build one feature end to end first
+R 3 | quality | Demo breaks live | Untested demo path | Weak presentation | Rehearse and record a backup video
+R 1 | dependency | API keys or services unavailable | Free tier limits | Feature blocked | Check limits and prepare a mock
+X 4 | quality | Present features that do not exist | Impress judges | Dishonest and risky | -
+
+@ Group coursework assignment | Group assignment released | Assignment submitted on time with good grade
+T Split tasks (Group leader) ; Research and draft (Members) ; Combine sections (Editor) ; Proofread and submit (Group leader)
+R 1 | communication | Unclear task split | Vague responsibilities | Gaps and overlaps | Write down who does what
+R 3 | quality | Inconsistent writing styles | Sections written separately | Disjointed document | Agree a style guide and an editor
+R 4 | schedule | Late submissions from members | Other deadlines | Rushed final version | Set an internal deadline before the real one
+X 2 | quality | Copy text from online sources | Save time | Plagiarism | -
+
+@ Student club event | Club wants to host a talk | Well-attended talk on campus
+T Book room (Club secretary) ; Invite speaker (Club president) ; Promote event (Social media lead) ; Host the talk (Committee)
+R 2 | dependency | Speaker cancels | Speaker schedule changes | Event cancelled | Have a backup plan or speaker
+R 3 | adoption | Low turnout | Clashes with exams | Empty room | Check the academic calendar
+R 1 | approval | Room booking not approved | Late request | No venue | Book through the official process early
+X 4 | budget | Offer expensive prizes to attract attendees | More people | Club budget exceeded | -
+
+@ Personal portfolio website | Student needs a portfolio for job applications | Portfolio online with best projects
+T Choose projects to show (Student) ; Design site (Student) ; Build and publish (Student) ; Get feedback (Mentor)
+R 1 | quality | Weak project descriptions | Only code links | Recruiters cannot see impact | Explain the problem, your role and the result
+R 3 | budget | Hosting costs | Paid hosting chosen | Unnecessary cost | Use free static hosting
+R 4 | quality | Broken links and images | No final check | Poor impression | Check every page before sharing
+X 2 | quality | Claim group projects as solo work | Look more impressive | Dishonest and easily discovered | -
+
+@ Lab experiment series | Experiment plan approved | Results recorded and analyzed
+T Prepare materials (Lab assistant) ; Run experiments (Student) ; Record results (Student) ; Analyze and report (Student)
+R 1 | logistics | Materials not available | Supplier delays | Experiments postponed | Order materials early
+R 2 | compliance | Safety rules not followed | Rushing to finish | Accidents | Brief safety rules before every session
+R 3 | data | Results recorded inconsistently | No standard template | Unusable data | Use a standard recording sheet
+X 4 | data | Repeat runs until results look right | Better results | Biased conclusions | -
+
+@ Open source contribution | Student wants to contribute to open source | Pull request merged
+T Choose project (Student) ; Understand codebase (Student) ; Make change (Student) ; Respond to review (Student)
+R 1 | scope | Project too large | Popular complex project | Overwhelmed | Start with issues labelled for beginners
+R 4 | communication | Reviews slow | Maintainers busy | Contribution stalls | Choose active projects and be patient
+R 3 | quality | Change breaks tests | Tests not run locally | Rejected pull request | Run the test suite before submitting
+X 2 | scope | Rewrite a core module without asking | Show initiative | Rejected and wasted effort | -
+
+@ Internship application season | Student starts applying for internships | Internship offer accepted
+T Prepare resume (Student) ; Apply to companies (Student) ; Practice interviews (Student) ; Choose offer (Student)
+R 1 | quality | Generic resume | Same resume for every role | Few responses | Tailor the resume to each role
+R 3 | schedule | Interviews clash with exams | Busy season | Poor performance | Plan around exam dates
+R 2 | schedule | Deadlines missed | Applications open early | Missed opportunities | Track deadlines in one place
+X 4 | quality | Exaggerate skills on the resume | More interviews | Fails in technical interviews | -
+
+@ Study group for exams | Exams in two months | Group members pass exams
+T Set schedule (Group organizer) ; Divide topics (Group) ; Weekly sessions (Group) ; Mock exams (Group)
+R 3 | staffing | Members stop attending | Motivation drops | Group falls apart | Keep sessions short and focused
+R 2 | quality | Topics covered unevenly | Members prepare different depths | Gaps in knowledge | Share summaries and check understanding
+R 4 | schedule | Mock exams skipped | Last-minute stress | Unprepared for real exam | Schedule mock exams early
+X 1 | scope | Cover every topic in detail | Be thorough | Not enough time | -

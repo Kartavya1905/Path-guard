@@ -324,3 +324,25 @@ def test_invalid_evidence_input_is_rejected(api):
     assert res.status_code == 200
     codes = {i["code"] for i in res.json()["readiness"]["issues"]}
     assert "dangling_reference" in codes and not res.json()["readiness"]["can_analyze"]
+
+
+def test_library_suggestions_can_be_added_to_review(api):
+    pid, rev = checkout_project(api)
+    out = generate(api, pid, rev).json()
+    res = api.get(f"/api/projects/{pid}/library/suggestions?k=3", headers=PLANNER)
+    assert res.status_code == 200 and len(res.json()) == 3
+    first = res.json()[0]
+    body = {"key": first["key"], "revision": out["revision"]}
+    added = api.post(f"/api/projects/{pid}/library/suggestions", json=body, headers=PLANNER)
+    assert added.status_code == 200, added.text
+    risk = next(r for r in added.json()["graph"]["risks"] if r["title"] == first["title"])
+    assert risk["review_status"] == "suggested" and risk["likelihood"]["kind"] == "unknown"
+    assert risk["rule_id"].startswith("library:")
+    again = {"key": first["key"], "revision": added.json()["revision"]}
+    assert (
+        api.post(
+            f"/api/projects/{pid}/library/suggestions", json=again, headers=PLANNER
+        ).status_code
+        == 404
+    )  # no longer offered once added
+    assert api.get(f"/api/projects/{pid}/library/suggestions", headers=OUTSIDER).status_code == 404

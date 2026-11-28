@@ -25,6 +25,8 @@ It has no FastAPI, database or model-provider imports. `tests/test_engine_isolat
 | `compare.py` | Applying a mitigation to a copy, and comparing a baseline with a variant |
 | `report.py` | Risk-register CSV with formula protection, estimate sources, evidence gaps, review summary |
 | `outcomes.py` | Turning comparable observed outcomes into an estimate candidate. Never applied automatically |
+| `library/` | The 100-case risk library (`cases.txt`), its loader and checks, similarity-based suggestions, and the leave-one-out quality test (`evaluate.py`) |
+| `retrieval.py` | Local TF-IDF similarity used to pick examples from your reviewed risks and the library |
 | `examples.py`, `fixtures.py` | The two hypothetical checkout examples, and synthetic branching maps for performance checks |
 
 ### How the probability engine counts runs

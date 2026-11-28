@@ -1,7 +1,8 @@
 import type { XYPosition } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
-  ApiError, aiApi, analysisApi, api, explorerApi, type AiExample, type AiStatus, mapApi, newMapId, type Analysis, type Explorer, type DraftOut, type GraphOut, type Me, type Readiness,
+  ApiError, aiApi, analysisApi, api, explorerApi, libraryApi, type AiExample, type AiStatus,
+  type LibrarySuggestion, mapApi, newMapId, type Analysis, type Explorer, type DraftOut, type GraphOut, type Me, type Readiness,
   type RiskCandidate, type Role, type ScenarioGraph, type Severity,
 } from './api'
 import {
@@ -76,6 +77,16 @@ export default function Workspace({ projectId }: Props) {
     return () => { live = false }
   }, [])
 
+  // Risk library (no AI): similar accepted risks from 100 use cases, around the selected step.
+  const [library, setLibrary] = useState<LibrarySuggestion[] | null>(null)
+  const focusNode = selection?.kind === 'node' ? selection.id : null
+  useEffect(() => {
+    if (savedRevision === undefined) return
+    let live = true
+    libraryApi.suggestions(projectId, focusNode).then((s) => { if (live) setLibrary(s) }, () => undefined)
+    return () => { live = false }
+  }, [projectId, savedRevision, focusNode])
+
   const graph = data?.graph
   const dirty = data !== null && JSON.stringify(data.graph) !== data.saved
   const role = data?.draft.role
@@ -129,6 +140,12 @@ export default function Workspace({ projectId }: Props) {
     if (needsClean() || !data) return
     applyServer(await mapApi.review(projectId, riskId, decision, modelBranch, data.revision))
     setNotice(decision === 'reject' ? 'Suggestion rejected.' : modelBranch ? 'Accepted, and its branch is now on the map.' : 'Suggestion accepted.')
+  })
+
+  const addFromLibrary = (s: LibrarySuggestion) => run(async () => {
+    if (needsClean() || !data) return
+    applyServer(await libraryApi.add(projectId, s.key, focusNode, data.revision))
+    setNotice(`Added “${s.title}” to the review list. It has no probability until you estimate it.`)
   })
 
   const askAi = () => run(async () => {
@@ -257,6 +274,35 @@ export default function Workspace({ projectId }: Props) {
           onSelect={setSelection} onReview={review}
           onAdd={(risk) => { update((g) => ({ ...g, risks: [...g.risks, risk] })); setSelection({ kind: 'risk', id: risk.id }) }}
           selectedNode={selection?.kind === 'node' ? selection.id : null} />
+        {!empty && library && library.length > 0 && (
+          <section className="panel-section" aria-labelledby="lib-h">
+            <h2 id="lib-h">From the risk library</h2>
+            <p className="muted small">
+              Risks teams accepted in similar projects (100 example cases)
+              {focusNode ? ', matched to the selected step' : ''}. No AI and no numbers: you decide.
+            </p>
+            <ul className="library-list">
+              {library.map((s) => (
+                <li key={s.key}>
+                  <strong>{s.title}</strong>
+                  <div className="small muted">{s.trigger}</div>
+                  <div className="risk-meta">
+                    <span className="tag">{s.category}</span>
+                    <span className="tag example">{s.domain}</span>
+                    {s.step_label && <span className="small muted">at “{s.step_label}”</span>}
+                  </div>
+                  <div className="small muted">Seen in: {s.case_title}</div>
+                  {canEdit && (
+                    <div className="row-actions start">
+                      <button type="button" disabled={busy || dirty} onClick={() => addFromLibrary(s)}
+                        aria-label={`Add to review: ${s.title}`}>Add to review</button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {ai?.enabled && canEdit && !empty && (
           <section className="panel-section" aria-labelledby="ai-h">
             <h2 id="ai-h">AI suggestions <span className="tag">optional</span></h2>

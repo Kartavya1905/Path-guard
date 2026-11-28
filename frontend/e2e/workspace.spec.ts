@@ -255,3 +255,15 @@ test('report, CSV export, sign-off, and an outcome turned into an approved estim
   await expect(page.getByText(/Estimate updated in a new revision/)).toBeVisible()
   await expect(page.getByRole('region', { name: 'Probability' })).toContainText('83.4%')
 })
+
+test('risk library suggests similar risks and adds one to review', async ({ page }) => {
+  const id = await checkoutProject(page.request)
+  await generate(page, id)
+  const lib = page.getByRole('region', { name: 'From the risk library' })
+  await expect(lib).toBeVisible()
+  await expect(lib.locator('li')).toHaveCount(5)
+  const title = (await lib.locator('li strong').first().textContent())!
+  await lib.getByRole('button', { name: `Add to review: ${title}` }).click()
+  await expect(page.getByText(`Added “${title}” to the review list.`)).toBeVisible()
+  await expect(page.locator('.risk-list')).toContainText(title)
+})

@@ -270,3 +270,34 @@ def test_remote_model_only_learns_from_opted_in_projects(api, ai_on, monkeypatch
     fake = ai_on(FakeProvider(json.dumps({"suggestions": []}), remote=True))
     assert ask(api, pid, rev, step).status_code == 200
     assert "Not opted in lesson" not in json.dumps(fake.messages)
+
+
+def test_ai_also_learns_from_the_risk_library(api, ai_on, monkeypatch):
+    pid, rev, step = mapped_project(api)
+    ai_on(FakeProvider(json.dumps({"suggestions": []})))
+    out = ask(api, pid, rev, step).json()
+    assert any(e["project_title"].startswith("Library: ") for e in out["examples_used"])
+
+    monkeypatch.setenv("PATHGUARD_AI_USE_LIBRARY", "false")
+    reset_caches()
+    ai_on(
+        FakeProvider(
+            json.dumps(
+                {
+                    "suggestions": [
+                        {
+                            "type": "hazard",
+                            "title": "x",
+                            "affected_node_id": step,
+                            "trigger": "t",
+                            "consequence": "c",
+                            "rationale": "r",
+                        }
+                    ]
+                }
+            )
+        )
+    )
+    graph = api.get(f"/api/projects/{pid}/graph", headers=PLANNER).json()
+    out = ask(api, pid, graph["revision"], step).json()
+    assert not any(e["project_title"].startswith("Library: ") for e in out["examples_used"])

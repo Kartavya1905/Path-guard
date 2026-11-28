@@ -468,3 +468,18 @@ export const aiApi = {
   suggest: (id: string, revision: number, focusNodeId: string | null) =>
     request<AiResult>('POST', `/projects/${encodeURIComponent(id)}/ai/suggestions`, { revision, focus_node_id: focusNodeId }),
 }
+
+// --------------------------------------------------------------------------- risk library
+
+export type LibrarySuggestion = {
+  key: string; case_title: string; domain: string; category: string; title: string
+  trigger: string; consequence: string; control: string | null; score: number
+  step_node_id: string | null; step_label: string | null
+}
+
+export const libraryApi = {
+  suggestions: (id: string, focusNodeId: string | null) =>
+    request<LibrarySuggestion[]>('GET', `/projects/${encodeURIComponent(id)}/library/suggestions?k=5${focusNodeId ? `&focus_node_id=${encodeURIComponent(focusNodeId)}` : ''}`),
+  add: (id: string, key: string, focusNodeId: string | null, revision: number) =>
+    request<GraphOut>('POST', `/projects/${encodeURIComponent(id)}/library/suggestions`, { key, focus_node_id: focusNodeId, revision }),
+}

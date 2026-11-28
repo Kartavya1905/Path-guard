@@ -62,6 +62,26 @@ The browser tests include `e2e/demo.spec.ts`, which runs the whole [demo script]
   - A real run with `qwen2.5:1.5b` on a new checkout project picked the seeded launch's accepted "Release defect or failed rollback" as its example (similarity 0.34) and took 20 s.
   - The model's own suggestions were all rejected as duplicates of the rule engine's existing risks. Retrieval works; the small default model limits the quality of its suggestions.
 
+## Risk library (100 use cases, 2026-11-28)
+
+- **Tests:** 7 more tests (backend total **196 passed**; browser tests **14 passed** on dev and on Compose, accessibility included). They cover:
+  - exactly 100 valid cases, 10 per domain, with 300 accepted risks
+  - no numeric estimates anywhere in the library
+  - parse errors reporting the line number
+  - checkout projects getting checkout-domain suggestions placed on their own steps
+  - added suggestions arriving as *suggested* risks with unknown likelihood
+  - the AI using library examples, and that switch turning it off
+  - the matching beating random picks on every measure
+- **Quality** (`python -m pathguard_engine.library.evaluate`: leave-one-out over 100 cases, top 5 suggestions, random baseline with a fixed seed):
+
+| Method | Hit rate | Precision | Recall | Same domain |
+|---|---|---|---|---|
+| Library matching, with domain | 91% | 37% | 48% | 36% |
+| Library matching, no domain | 92% | 37% | 48% | 29% |
+| Random picks (baseline) | 69% | 24% | 33% | 8% |
+
+- **What this measures:** relevance to the library's own examples, not real-world accuracy.
+
 ## Responsiveness
 
 Command: `backend`: `.\.venv\Scripts\python.exe scripts/perf_check.py`, with the Compose stack running.

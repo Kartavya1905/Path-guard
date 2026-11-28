@@ -250,6 +250,32 @@ In the workspace **Outcomes** view:
 
 API: `GET/POST /api/projects/{id}/outcomes`, `GET …/outcomes/proposal?transition_id=&context=`, `POST …/outcomes/apply`.
 
+### Risk library: 100 use cases PathGuard learns from
+
+`backend/pathguard_engine/library/cases.txt` holds **100 realistic project use cases**, 10 in each of 10 domains:
+
+- software, mobile, checkout, data, infrastructure
+- marketing, events, hiring, security, student and academic
+
+Each case has a start, goal, tasks with owner roles, **3 risks a team accepted** (each with trigger, consequence and control), and **1 idea a team rejected**. That's 400 risks in all. The cases are illustrative, written from common project-management practice. They are not recorded outcomes and contain no statistics or probabilities; a test fails if any numeric estimate slips in.
+
+"Learning" here means retrieval, not model training:
+
+- **Without AI:** the workspace's **From the risk library** panel shows the 5 accepted risks from the most similar cases. They are matched by word similarity to your start, goal and steps, or to the selected step. Each is placed on your best-matching step. **Add to review** puts one into the normal review list as a *suggested* risk with unknown likelihood.
+- **With the optional AI:** the same library joins your own reviewed risks as examples for the local model (`PATHGUARD_AI_USE_LIBRARY`, default on).
+
+**How good are the suggestions?** `python -m pathguard_engine.library.evaluate` runs a leave-one-out test. Each case is hidden in turn, the library suggests 5 risks from its start, goal and task names, and the result is compared with the kinds of risk that case's team accepted. Random picks are the baseline:
+
+| Method | Hit rate | Precision | Recall | Same domain |
+|---|---|---|---|---|
+| Library matching, with domain | 91% | 37% | 48% | 36% |
+| Library matching, no domain | 92% | 37% | 48% | 29% |
+| Random picks (baseline) | 69% | 24% | 33% | 8% |
+
+Hit rate is the share of cases where at least one of the 5 suggestions is the right kind of risk. This measures relevance to the library's own examples, not real-world accuracy. The matching clearly beats random, but it's a starting point: grow the library, or add your own reviewed projects, to improve it.
+
+API: `GET /api/projects/{id}/library/suggestions?focus_node_id=&k=5`, `POST /api/projects/{id}/library/suggestions` with `key` and `revision`.
+
 ### Optional AI suggestions (off by default)
 
 AI suggestions add hazards, missing steps and recovery branches to the **same review list** as the rule suggestions. They are hypotheses with no numbers. The rules-only workflow is complete without them.

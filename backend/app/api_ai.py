@@ -30,6 +30,7 @@ from pathguard_engine.ai import (
     to_suggestions,
 )
 from pathguard_engine.ids import EntityId
+from pathguard_engine.library import library_sources
 from pathguard_engine.retrieval import SourceProject, select_examples
 
 router = APIRouter(prefix="/api")
@@ -109,8 +110,11 @@ def ai_suggestions(project_id: str, body: AiRequest, session: SessionDep,
         near = _nearby(graph, body.focus_node_id)
         query = " ".join([plan.project.start, plan.project.goal,
                           plan.project.context.domain or "", *(n.label for n in near)])
+        pool = _sources(session, user, row, provider.remote)
+        if settings.ai_use_library:
+            pool += list(library_sources())  # curated examples, not user data
         learned, avoided = select_examples(
-            query, _sources(session, user, row, provider.remote),
+            query, pool,
             accepted=settings.ai_examples, rejected=settings.ai_avoid)
     prompt = build_prompt(
         plan, graph, body.focus_node_id, settings.ai_max_input_chars,

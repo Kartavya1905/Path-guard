@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     # rejected ideas from your other projects go into each AI request. 0 turns it off.
     ai_examples: int = 4
     ai_avoid: int = 3
+    ai_use_library: bool = True  # also learn from the built-in 100-case risk library
 
     @field_validator("database_url")
     @classmethod
